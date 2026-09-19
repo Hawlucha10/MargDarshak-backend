@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Environment variables (NEVER commit secrets)
+.env
+
+# ML model files (too large for git)
+app/ml/models/*.pkl
+app/ml/models/*.joblib
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Docker
+*.log
+
+# Data files (too large for git — use Git LFS or download separately)
+data/delay_prediction/ir_train.csv
+data/delay_prediction/ir_test.csv
+data/delay_prediction/ir_sample_submission.csv
+data/timetable/train_schedules.json
+data/stations/stations_geo.geojson
+
+# Jupyter
+.ipynb_checkpoints/
+
+# pytest
+.pytest_cache/
+htmlcov/
+.coverage
