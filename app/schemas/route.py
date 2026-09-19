@@ -10,6 +10,7 @@ class RouteSearchRequest(BaseModel):
     travel_date: str = Field(..., description="Date of travel (YYYY-MM-DD)")
     max_transfers: int = Field(default=2, ge=0, le=3, description="Maximum train changes (0 to 3)")
     priority: str = Field(default="balanced", description="Optimization priority: fastest, cheapest, balanced, reliable")
+    accessible_only: bool = Field(default=False, description="Require 100% step-free wheelchair ramp accessibility")
 
 
 class TrainLeg(BaseModel):
@@ -40,9 +41,12 @@ class JourneyRoute(BaseModel):
     total_fare: Optional[int] = None
     transfers: int
     reliability_score: float = Field(..., ge=0.0, le=1.0)
+    joint_reliability_percent: Optional[str] = None
     legs: List[TrainLeg]
     transfers_info: List[TransferConnection] = []
     fare_arbitrage_tip: Optional[str] = None
+    accessibility_badge: Optional[str] = None
+    weather_advisory: Optional[str] = None
 
 
 class RouteSearchResponse(BaseModel):

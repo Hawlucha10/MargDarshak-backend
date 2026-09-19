@@ -1,13 +1,14 @@
 """
 Route Search API Endpoint
-Orchestrates: AGRD -> ML Delay buffer -> RAPTOR multi-hop search -> Fare Arbitrage -> Pareto Ranker.
+Orchestrates: AGRD -> ML Delay buffer -> RAPTOR multi-hop search -> Fare & Quota Arbitrage
+              -> Probabilistic Reliability -> Weather & Accessibility Audit -> Pareto Ranker.
 """
 
 import time
 import uuid
-from typing import List
-from fastapi import APIRouter, Depends
-from sqlalchemy.ext.asyncio import AsyncSession
+from typing import List, Dict, Any
+from pydantic import BaseModel, Field
+from fastapi import APIRouter
 
 from app.schemas.route import (
     RouteSearchRequest,
@@ -17,20 +18,38 @@ from app.schemas.route import (
     TransferConnection,
 )
 from app.core.pareto import find_pareto_front, assign_pareto_labels
-from app.core.fare_arbitrage import find_upstream_arbitrage
+from app.core.reliability import compute_joint_route_reliability
+from app.core.demand_buffer import get_demand_adaptive_buffer
+from app.core.accessibility import audit_route_accessibility
+from app.services.weather_service import WeatherAwareRouter
+from app.services.nlp_search import parse_natural_language_query
 from app.ml.delay_predictor import DelayPredictor
-from app.core.raptor import minutes_to_time_str
 
 router = APIRouter()
 delay_predictor = DelayPredictor()
+weather_router = WeatherAwareRouter()
+
+
+class NLPSearchRequest(BaseModel):
+    query: str = Field(..., description="Conversational query in English or Hindi (e.g. 'पुणे से दिल्ली सबसे सस्ता रास्ता')", min_length=2)
+
+
+@router.post("/search/nlp", response_model=RouteSearchResponse)
+async def search_routes_nlp(payload: NLPSearchRequest):
+    """
+    Conversational Natural Language Search endpoint (English & Hindi).
+    Extracts origin, destination, date, and constraints, then executes route search.
+    """
+    parsed = parse_natural_language_query(payload.query)
+    req: RouteSearchRequest = parsed["parsed_request"]
+    return await search_routes(req)
 
 
 @router.post("/search", response_model=RouteSearchResponse)
 async def search_routes(request: RouteSearchRequest):
     """
-    Finds optimal routes between origin and destination.
-    Applies AGRD spatial discovery, ML delay buffer inflation,
-    RAPTOR multi-hop search, and Pareto multi-criteria ranking.
+    Core Route Search:
+    Executes AGRD -> ML Delay buffer -> RAPTOR multi-hop search -> Fare Arbitrage -> Pareto Ranker.
     """
     start_time = time.time()
     search_id = str(uuid.uuid4())
@@ -38,27 +57,46 @@ async def search_routes(request: RouteSearchRequest):
     origin = request.origin.upper()
     dest = request.destination.upper()
 
-    # 1. Predict delays and safe buffers for candidate corridors
+    # 1. Demand-Adaptive Buffer (Festival & Holiday Calendar)
+    demand_info = get_demand_adaptive_buffer(request.travel_date, base_buffer_min=30)
+    effective_buffer = demand_info["effective_buffer_min"]
+
+    # 2. ML Delay Prediction & Explainability
+    month_val = int(request.travel_date.split("-")[1])
     pred_res = delay_predictor.predict_delay(
         train_number="12627",
-        month=int(request.travel_date.split("-")[1]),
+        month=month_val,
         zone="NR",
         distance_km=850,
     )
     predicted_delay = pred_res["predicted_delay_minutes"]
-    safe_buffer = pred_res["safe_transfer_buffer_minutes"]
     risk_warning = " ".join(pred_res["explanations"]) if pred_res["explanations"] else None
 
-    # 2. Mock candidate journeys simulating RAPTOR discovery across rounds
-    # In Phase 2 this reads directly from PostgreSQL database
+    # 3. Weather Hazard Inspection (IMD alerts)
+    weather_audit = weather_router.inspect_route_weather(
+        station_codes=[origin, "BPL", "JHS", dest],
+        zones=["NR", "NCR", "WCR", "CR"],
+    )
+    weather_advisory = (
+        weather_audit["reroute_advice"]
+        or (f"🌦️ {weather_audit['active_advisories'][0]['description']}" if weather_audit["has_weather_impact"] else None)
+    )
+
+    # 4. Accessibility Audit (PwD step-free check)
+    acc_audit = audit_route_accessibility(
+        station_codes=[origin, "BPL", dest],
+        require_step_free=request.accessible_only,
+    )
+
+    # 5. Candidate Journeys simulating discovered paths across RAPTOR rounds
     candidate_routes = [
-        # Candidate 1: Fast 1-transfer route
+        # Candidate 1: Fast 1-transfer route via Bhopal
         {
             "id": "c1",
             "travel_time_min": 780,  # 13h
             "fare": 950,
             "transfers": 1,
-            "wait_time_min": safe_buffer,
+            "wait_time_min": effective_buffer,
             "reliability": 0.89,
             "legs": [
                 TrainLeg(
@@ -92,20 +130,20 @@ async def search_routes(request: RouteSearchRequest):
                 TransferConnection(
                     station_code="BPL",
                     station_name="Bhopal Junction",
-                    wait_time_minutes=safe_buffer,
+                    wait_time_minutes=effective_buffer,
                     is_safe=True,
-                    delay_risk_warning=risk_warning,
+                    delay_risk_warning=demand_info["explanation"] if demand_info["is_peak_demand"] else risk_warning,
                 )
             ],
             "fare_arbitrage_tip": None,
         },
-        # Candidate 2: Economical Sleeper route
+        # Candidate 2: Economical route via Jhansi
         {
             "id": "c2",
             "travel_time_min": 960,  # 16h
             "fare": 480,
             "transfers": 1,
-            "wait_time_min": safe_buffer + 30,
+            "wait_time_min": effective_buffer + 30,
             "reliability": 0.82,
             "legs": [
                 TrainLeg(
@@ -139,14 +177,14 @@ async def search_routes(request: RouteSearchRequest):
                 TransferConnection(
                     station_code="JHS",
                     station_name="Jhansi Junction",
-                    wait_time_minutes=90,
+                    wait_time_minutes=effective_buffer + 30,
                     is_safe=True,
-                    delay_risk_warning="Safe changeover buffer verified.",
+                    delay_risk_warning="Safe changeover verified.",
                 )
             ],
-            "fare_arbitrage_tip": "💡 Confirmed Sleeper berths available if booked from Agra Cantt (AGC) upstream.",
+            "fare_arbitrage_tip": "💡 Confirmed Sleeper berths available under Remote Location Quota (RLGN) from Agra Cantt (AGC) upstream.",
         },
-        # Candidate 3: Most Reliable direct or 0-transfer
+        # Candidate 3: Direct / 0-transfer route
         {
             "id": "c3",
             "travel_time_min": 1020,  # 17h
@@ -174,25 +212,40 @@ async def search_routes(request: RouteSearchRequest):
         },
     ]
 
-    # 3. Apply Multi-Criteria Pareto Optimization
+    # Filter out routes if user explicitly demanded wheelchair accessibility
+    if request.accessible_only and not acc_audit["is_accessible_route"]:
+        # Only keep routes that pass compliant stations
+        candidate_routes = [c for c in candidate_routes if c["transfers"] == 0]
+
+    # 6. Apply Multi-Criteria Pareto Optimization
     pareto_candidates = find_pareto_front(candidate_routes)
     labeled_candidates = assign_pareto_labels(pareto_candidates)
 
-    # 4. Format for API Response
+    # 7. Compute Probabilistic Joint Reliability Score & Build Response
     final_routes = []
     for c in labeled_candidates:
         hours = c["travel_time_min"] // 60
         mins = c["travel_time_min"] % 60
+
+        legs_dict = [leg.model_dump() for leg in c["legs"]]
+        rel_analysis = compute_joint_route_reliability(
+            legs=legs_dict,
+            transfer_buffers_min=[c["wait_time_min"]],
+        )
+
         final_routes.append(
             JourneyRoute(
                 label=c["label"],
                 total_travel_time=f"{hours}h {mins}m",
                 total_fare=c["fare"],
                 transfers=c["transfers"],
-                reliability_score=c["reliability"],
+                reliability_score=rel_analysis["joint_reliability_score"],
+                joint_reliability_percent=rel_analysis["joint_reliability_percent"],
                 legs=c["legs"],
                 transfers_info=c["transfers_info"],
                 fare_arbitrage_tip=c["fare_arbitrage_tip"],
+                accessibility_badge=acc_audit["accessibility_badge"],
+                weather_advisory=weather_advisory,
             )
         )
 
