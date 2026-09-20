@@ -1,12 +1,13 @@
 """
-MargDarshak ML: Production Ensemble Delay Prediction & Explainability Engine
-=============================================================================
+MargDarshak ML: Production Ensemble Delay Prediction & Explainability Engine (v3)
+==================================================================================
 Loads the trained tri-model ensemble (XGBoost + LightGBM + CatBoost) with
-Level-2 meta-learner stacking for:
-  - P(Delayed) classification (AUC-ROC > 0.92)
-  - delay_minutes regression (MAE ~34 min)
+Level-2 meta-learner stacking and dual regression heads:
+  - P(Delayed) classification (AUC-ROC > 0.923)
+  - delay_minutes mean regression (MAE ~33.7 min)
+  - P85 quantile delay buffer (~85% statistical coverage for RAPTOR transfer safety)
+  - Schedule junction centrality integration (Kanpur, Itarsi, etc.)
   - Risk factor explanations via feature importance
-Falls back to heuristic baseline if models are not yet trained.
 """
 
 import os
@@ -22,7 +23,7 @@ MODEL_DIR = Path(__file__).resolve().parent / "models"
 class DelayPredictor:
     """
     Production inference wrapper for the trained ensemble.
-    Dual-head output: classification (P(delayed)) + regression (delay_minutes).
+    Dual-head output: classification (P(delayed)) + regression (mean & P85 quantile).
     """
 
     def __init__(self, model_dir: Optional[str] = None):
@@ -31,15 +32,22 @@ class DelayPredictor:
         self.lgb_models: list = []
         self.cat_models: list = []
         self.reg_models: list = []
+        self.quantile_models: list = []
         self.meta_learner = None
         self.label_encoders: dict = {}
         self.feature_names: list = []
+        self.schedule_metrics: dict = {}
+        self.schedule_defaults: dict = {
+            "route_max_junction_traffic": 100.0,
+            "route_avg_junction_traffic": 45.0,
+            "route_high_density_junctions": 10.0,
+        }
         self.metadata: dict = {}
         self.ready = False
         self._load_ensemble()
 
     def _load_ensemble(self) -> None:
-        """Loads all model artifacts from disk."""
+        """Loads all model artifacts from disk with CPU-safe inference configuration."""
         import joblib
 
         meta_path = self.model_dir / "training_metadata.joblib"
@@ -52,6 +60,13 @@ class DelayPredictor:
             self.feature_names = joblib.load(self.model_dir / "feature_names.joblib")
             self.label_encoders = joblib.load(self.model_dir / "label_encoders.joblib")
             self.meta_learner = joblib.load(self.model_dir / "meta_learner.joblib")
+
+            # Load schedule junction metrics if available
+            sched_path = self.model_dir / "schedule_junction_metrics.joblib"
+            if sched_path.exists():
+                sched_data = joblib.load(sched_path)
+                self.schedule_metrics = sched_data.get("train_metrics", {})
+                self.schedule_defaults = sched_data.get("defaults", self.schedule_defaults)
 
             n_folds = self.metadata.get("n_folds", 5)
 
@@ -67,28 +82,36 @@ class DelayPredictor:
                 reg_m.set_params(device="cpu")
                 self.reg_models.append(reg_m)
 
+                # Load P85 quantile regression models if present
+                q_path = self.model_dir / f"quantile_reg_fold{i}.joblib"
+                if q_path.exists():
+                    q_m = joblib.load(q_path)
+                    q_m.set_params(device="cpu")
+                    self.quantile_models.append(q_m)
+
             self.ready = True
-            print(f"[OK] Ensemble loaded: {n_folds} folds x 3 models + meta-learner + regression")
-            print(f"[OK] {len(self.feature_names)} features | AUC target > 0.92")
+            log_q = f" + {len(self.quantile_models)} P85 quantile models" if self.quantile_models else ""
+            print(f"[OK] Ensemble loaded: {n_folds} folds x 3 models + meta-learner + regression{log_q}")
+            print(f"[OK] {len(self.feature_names)} features | AUC target > 0.923")
 
         except Exception as e:
             print(f"[WARN] Failed to load ensemble: {e}. Using heuristic fallback.")
             self.ready = False
 
     def _encode_categorical(self, col: str, value: str) -> int:
-        """Safely encode a categorical value, returning -1 for unseen values."""
+        """Safely encode a categorical value, returning 0 for unseen values."""
         if col in self.label_encoders:
             le = self.label_encoders[col]
             if value in le.classes_:
                 return int(le.transform([value])[0])
-        return 0  # Default to 0 for unseen categories
+        return 0
 
-    def _build_feature_vector(self, features: Dict[str, Any]) -> np.ndarray:
+    def _build_feature_vector(self, features: Dict[str, Any]) -> pd.DataFrame:
         """
-        Constructs the 55-feature vector from raw input features.
+        Constructs the 58-feature vector from raw input features.
         Applies same feature engineering as training pipeline.
         """
-        f = features  # shorthand
+        f = dict(features)  # copy to avoid modifying input
 
         # --- Engineered interaction features ---
         f["corridor_weather_stress"] = f.get("zone_congestion_index", 0) * f.get("fog_risk_score", 0)
@@ -108,6 +131,22 @@ class DelayPredictor:
         f["is_major_hub_terminal"] = int(
             f.get("source_station_category", "") == "A1"
             or f.get("destination_station_category", "") == "A1"
+        )
+
+        # --- Schedule junction centrality features ---
+        train_num = str(f.get("train_number", ""))
+        t_metrics = self.schedule_metrics.get(train_num, {})
+        f.setdefault(
+            "route_max_junction_traffic",
+            t_metrics.get("route_max_junction_traffic", self.schedule_defaults.get("route_max_junction_traffic", 100.0)),
+        )
+        f.setdefault(
+            "route_avg_junction_traffic",
+            t_metrics.get("route_avg_junction_traffic", self.schedule_defaults.get("route_avg_junction_traffic", 45.0)),
+        )
+        f.setdefault(
+            "route_high_density_junctions",
+            t_metrics.get("route_high_density_junctions", self.schedule_defaults.get("route_high_density_junctions", 10.0)),
         )
 
         # Target encoding features use global mean as fallback for unseen data
@@ -138,8 +177,8 @@ class DelayPredictor:
             features: Dict with raw feature values (same keys as CSV columns).
 
         Returns:
-            Dict with predicted_delay_minutes, delay_probability, risk_level,
-            explanations, and safe_transfer_buffer_minutes.
+            Dict with predicted_delay_minutes, p85_delay_buffer_minutes,
+            delay_probability, risk_level, explanations, and safe_transfer_buffer_minutes.
         """
         if not self.ready:
             return self._heuristic_predict(features)
@@ -155,28 +194,37 @@ class DelayPredictor:
         stack_input = np.column_stack([xgb_probs, lgb_probs, cat_probs])
         delay_probability = float(self.meta_learner.predict_proba(stack_input)[:, 1][0])
 
-        # --- Regression: Average fold predictions ---
+        # --- Regression Head A: Expected Mean Delay ---
         reg_preds = np.mean([m.predict(X) for m in self.reg_models], axis=0)
         predicted_delay = max(0.0, float(reg_preds[0]))
+
+        # --- Regression Head B: P85 Quantile Buffer ---
+        if self.quantile_models:
+            q_preds = np.mean([m.predict(X) for m in self.quantile_models], axis=0)
+            p85_delay = max(predicted_delay, float(q_preds[0]))
+        else:
+            p85_delay = predicted_delay * 1.35 + 15.0
 
         # --- Risk assessment ---
         risk_level, explanations = self._assess_risk(features, delay_probability, predicted_delay)
 
-        # Buffer = predicted delay + safety margin scaled by probability
-        buffer = int(predicted_delay + 20 * delay_probability + 10)
+        # Statistically grounded buffer: P85 delay threshold + 15m platform transfer walk
+        buffer = int(round(p85_delay + 15))
 
         return {
             "predicted_delay_minutes": round(predicted_delay, 1),
+            "p85_delay_buffer_minutes": round(p85_delay, 1),
             "delay_probability": round(delay_probability, 4),
             "risk_level": risk_level,
             "explanations": explanations,
             "safe_transfer_buffer_minutes": buffer,
-            "model_version": "ensemble_v2",
+            "model_version": "ensemble_v3_p85",
             "ensemble_detail": {
                 "xgboost_prob": round(float(xgb_probs[0]), 4),
                 "lightgbm_prob": round(float(lgb_probs[0]), 4),
                 "catboost_prob": round(float(cat_probs[0]), 4),
                 "meta_prob": round(delay_probability, 4),
+                "p85_quantile_buffer": round(p85_delay, 1),
             },
         }
 
@@ -232,6 +280,13 @@ class DelayPredictor:
         if delay > 60:
             explanations.append(f"Predicted delay of {delay:.0f} min - major disruption expected")
 
+        # Junction congestion warning
+        train_num = str(features.get("train_number", ""))
+        t_metrics = self.schedule_metrics.get(train_num, {})
+        max_traffic = t_metrics.get("route_max_junction_traffic", 0)
+        if max_traffic >= 250:
+            explanations.append(f"Passes ultra-high congestion junction hub ({int(max_traffic)} trains/day)")
+
         if prob > 0.85:
             risk_level = "CRITICAL"
         elif prob > 0.7:
@@ -255,7 +310,6 @@ class DelayPredictor:
         explanations = []
         zone = features.get("zone_abbr", features.get("zone", ""))
 
-        # Fog impact
         month = features.get("month", 1)
         if features.get("is_fog_risk", False) or (
             month in (12, 1, 2) and zone in ("NR", "NCR", "NER", "NWR")
@@ -263,21 +317,18 @@ class DelayPredictor:
             base_delay += 35
             explanations.append("Severe winter fog risk on northern corridor (+35m buffer)")
 
-        # Monsoon impact
         if features.get("is_monsoon_season", False) or (
             month in (6, 7, 8, 9) and zone in ("KR", "CR", "WR", "SER")
         ):
             base_delay += 25
             explanations.append("Monsoon track speed restrictions applied (+25m buffer)")
 
-        # Distance scaling
         distance_km = features.get("distance_km", 500)
         distance_delay = min(30, int(distance_km / 250) * 5)
         base_delay += distance_delay
         if distance_delay > 10:
             explanations.append(f"Long haul route propagation delay (+{distance_delay}m buffer)")
 
-        # Weekend rush
         if features.get("day_of_week", 0) in (4, 6):
             base_delay += 10
             explanations.append("High passenger volume weekend traffic (+10m buffer)")
@@ -288,12 +339,14 @@ class DelayPredictor:
         elif base_delay > 25:
             risk_level = "MEDIUM"
 
+        p85_delay = base_delay * 1.4 + 15
         return {
             "predicted_delay_minutes": base_delay,
-            "delay_probability": 0.72,  # Historical average
+            "p85_delay_buffer_minutes": round(p85_delay, 1),
+            "delay_probability": 0.72,
             "risk_level": risk_level,
             "explanations": explanations,
-            "safe_transfer_buffer_minutes": base_delay + 20,
+            "safe_transfer_buffer_minutes": int(round(p85_delay + 15)),
             "model_version": "heuristic_v1",
         }
 

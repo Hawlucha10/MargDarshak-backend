@@ -1,7 +1,7 @@
 """
-Unit & Integration Tests for MargDarshak ML Delay Prediction Ensemble
-Tests the 55-feature pipeline, tri-model stacking (XGBoost + LightGBM + CatBoost),
-meta-learner, and regression heads.
+Unit & Integration Tests for MargDarshak ML Delay Prediction Ensemble (v3)
+Tests the 58-feature pipeline, tri-model stacking (XGBoost + LightGBM + CatBoost),
+meta-learner, mean regression, and P85 quantile safety buffer.
 """
 
 import pytest
@@ -14,20 +14,23 @@ def predictor():
 
 
 def test_predictor_loaded(predictor):
-    """Verifies that the trained ensemble models are loaded."""
+    """Verifies that the trained ensemble models and schedule metrics are loaded."""
     assert predictor is not None
     assert predictor.ready is True
     assert len(predictor.xgb_models) == 5
     assert len(predictor.lgb_models) == 5
     assert len(predictor.cat_models) == 5
     assert len(predictor.reg_models) == 5
+    assert len(predictor.quantile_models) == 5
     assert predictor.meta_learner is not None
-    assert len(predictor.feature_names) == 55
+    assert len(predictor.feature_names) == 58
+    assert len(predictor.schedule_metrics) > 0
 
 
 def test_ensemble_predict_output(predictor):
-    """Tests that predict() produces dual-head classification and regression outputs."""
+    """Tests that predict() produces dual-head classification, mean, and P85 quantile outputs."""
     sample_input = {
+        "train_number": "12627",
         "train_type": "Superfast Express",
         "year": 2024,
         "month": 7,
@@ -72,6 +75,7 @@ def test_ensemble_predict_output(predictor):
     result = predictor.predict(sample_input)
 
     assert "predicted_delay_minutes" in result
+    assert "p85_delay_buffer_minutes" in result
     assert "delay_probability" in result
     assert "risk_level" in result
     assert "explanations" in result
@@ -81,16 +85,20 @@ def test_ensemble_predict_output(predictor):
     # Numerical sanity checks
     assert isinstance(result["predicted_delay_minutes"], float)
     assert result["predicted_delay_minutes"] >= 0.0
+    assert isinstance(result["p85_delay_buffer_minutes"], float)
+    # P85 quantile buffer must be greater than or equal to expected mean delay
+    assert result["p85_delay_buffer_minutes"] >= result["predicted_delay_minutes"]
     assert 0.0 <= result["delay_probability"] <= 1.0
-    assert result["safe_transfer_buffer_minutes"] >= result["predicted_delay_minutes"]
+    assert result["safe_transfer_buffer_minutes"] >= result["p85_delay_buffer_minutes"]
     assert result["risk_level"] in ("LOW", "MEDIUM", "HIGH", "CRITICAL")
 
-    # Detailed probabilities across all 3 models + meta-learner
+    # Detailed probabilities across all 3 models + meta-learner + P85 buffer
     detail = result["ensemble_detail"]
     assert 0.0 <= detail["xgboost_prob"] <= 1.0
     assert 0.0 <= detail["lightgbm_prob"] <= 1.0
     assert 0.0 <= detail["catboost_prob"] <= 1.0
     assert 0.0 <= detail["meta_prob"] <= 1.0
+    assert "p85_quantile_buffer" in detail
 
 
 def test_predict_delay_wrapper(predictor):
@@ -102,5 +110,6 @@ def test_predict_delay_wrapper(predictor):
         distance_km=850,
     )
     assert res["predicted_delay_minutes"] > 0
-    assert res["model_version"] == "ensemble_v2"
+    assert res["p85_delay_buffer_minutes"] >= res["predicted_delay_minutes"]
+    assert res["model_version"] == "ensemble_v3_p85"
     assert len(res["explanations"]) > 0
