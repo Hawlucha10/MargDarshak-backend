@@ -23,3 +23,5 @@ class StationSearchResult(BaseModel):
     name: str
     zone: Optional[str] = None
     state: Optional[str] = None
+    distance_km: Optional[int] = None
+    is_hub: Optional[bool] = False

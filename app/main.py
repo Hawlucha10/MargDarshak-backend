@@ -18,18 +18,14 @@ async def lifespan(app: FastAPI):
     """Startup & shutdown events — connect/disconnect databases."""
     # --- STARTUP ---
     settings = get_settings()
-    print(f"🚆 MargDarshak API starting on {settings.api_host}:{settings.api_port}")
-    print(f"📦 PostgreSQL: {settings.postgres_host}:{settings.postgres_port}/{settings.postgres_db}")
-    print(f"⚡ Redis: {settings.redis_host}:{settings.redis_port}")
-
-    # Database connections will be initialized here in Phase 1
-    # await db.connect()
-    # await redis.connect()
+    print(f"[STARTUP] MargDarshak API starting on {settings.api_host}:{settings.api_port}")
+    print(f"[STARTUP] PostgreSQL: {settings.postgres_host}:{settings.postgres_port}/{settings.postgres_db}")
+    print(f"[STARTUP] Redis: {settings.redis_host}:{settings.redis_port}")
 
     yield  # App is running
 
     # --- SHUTDOWN ---
-    print("🛑 MargDarshak API shutting down...")
+    print("[SHUTDOWN] MargDarshak API shutting down...")
     # await db.disconnect()
     # await redis.disconnect()
 

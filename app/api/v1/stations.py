@@ -1,23 +1,31 @@
 """Station search and discovery endpoints."""
 
-from typing import List
+from typing import List, Optional
 from fastapi import APIRouter, Query
 from app.schemas.station import StationSearchResult
+from app.services.station_service import (
+    search_stations as search_stations_service,
+    get_popular_stations as get_popular_stations_service,
+)
 
 router = APIRouter()
 
 
 @router.get("/stations/search", response_model=List[StationSearchResult])
 async def search_stations(
-    q: str = Query(..., min_length=1, description="Station name or code prefix (e.g. Gwal or GWL)"),
-    limit: int = Query(10, ge=1, le=50),
+    q: Optional[str] = Query(None, description="Station name, code, or city (e.g. GWL, Gwalior, NDLS, Delhi, Noida)"),
+    limit: int = Query(15, ge=1, le=50),
 ):
-    """Search stations by code or name prefix (autocomplete)."""
-    # Placeholder implementation before database ingestion in Phase 1
-    return [
-        StationSearchResult(code="GWL", name="Gwalior Junction", zone="NCR", state="Madhya Pradesh"),
-        StationSearchResult(code="PUNE", name="Pune Junction", zone="CR", state="Maharashtra"),
-        StationSearchResult(code="BPL", name="Bhopal Junction", zone="WCR", state="Madhya Pradesh"),
-        StationSearchResult(code="NGP", name="Nagpur Junction", zone="CR", state="Maharashtra"),
-        StationSearchResult(code="NDLS", name="New Delhi", zone="NR", state="Delhi"),
-    ]
+    """
+    Real-time autocomplete search across all 8,989 Indian Railway stations.
+    Supports station code prefix/exact, station name, city hubs, and satellite nearby stations.
+    """
+    if not q or not q.strip():
+        return get_popular_stations_service()[:limit]
+    return await search_stations_service(query=q, limit=limit)
+
+
+@router.get("/stations/popular", response_model=List[StationSearchResult])
+async def get_popular_stations(limit: int = Query(10, ge=1, le=20)):
+    """Return top major railway hub terminals (e.g., NDLS, GWL, PUNE, CSTM, HWH, SBC)."""
+    return get_popular_stations_service()[:limit]
