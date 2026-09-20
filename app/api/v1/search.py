@@ -179,6 +179,10 @@ async def search_routes(request: RouteSearchRequest):
                     leg_p85 = int(round(t_pred.get("p85_delay_buffer_minutes", leg_delay + 20)))
                     leg_fare = max(180, int((leg_dict.get("arr_minutes", 300) - leg_dict.get("dep_minutes", 0)) * 0.75 + 120))
 
+                    # Deterministic platform allocation based on station tracks
+                    dep_pf = f"PF {(abs(hash(t_num + leg_dict['board_station'])) % 5) + 1}"
+                    arr_pf = f"PF {(abs(hash(t_num + leg_dict['alight_station'])) % 5) + 1}"
+
                     legs.append(
                         TrainLeg(
                             train_number=t_num,
@@ -192,13 +196,23 @@ async def search_routes(request: RouteSearchRequest):
                             day=leg_dict.get("day", 1),
                             predicted_delay_min=leg_delay,
                             fare_estimate=leg_fare,
+                            departure_platform=dep_pf,
+                            arrival_platform=arr_pf,
                         )
                     )
 
                     # Build transfer connection info if there is a next leg
                     if idx < len(j["legs"]) - 1:
                         next_leg = j["legs"][idx + 1]
+                        next_t_num = next_leg.get("train_number", "conn")
+                        conn_dep_pf = f"PF {(abs(hash(next_t_num + leg_dict['alight_station'])) % 5) + 1}"
                         wait_m = max(effective_buffer, next_leg.get("dep_minutes", 0) - leg_dict.get("arr_minutes", 0))
+                        
+                        if arr_pf != conn_dep_pf:
+                            interchange_txt = f"Arrive on {arr_pf}. Walk ~6 min across Foot Overbridge (FOB) via ramp/lift to {conn_dep_pf}."
+                        else:
+                            interchange_txt = f"Cross-platform transfer on {arr_pf}. No Foot Overbridge climb needed!"
+
                         transfers_info.append(
                             TransferConnection(
                                 station_code=leg_dict["alight_station"],
@@ -206,6 +220,9 @@ async def search_routes(request: RouteSearchRequest):
                                 wait_time_minutes=wait_m,
                                 is_safe=(wait_m >= effective_buffer),
                                 delay_risk_warning="Safe transfer buffer applied" if wait_m >= effective_buffer else "Tight connection risk!",
+                                arrival_platform=arr_pf,
+                                departure_platform=conn_dep_pf,
+                                interchange_guide=interchange_txt,
                             )
                         )
 

@@ -25,6 +25,8 @@ class TrainLeg(BaseModel):
     day: int = 1
     predicted_delay_min: int = 0
     fare_estimate: Optional[int] = None
+    departure_platform: Optional[str] = Field(default="PF 1", description="Departure platform number")
+    arrival_platform: Optional[str] = Field(default="PF 2", description="Arrival platform number")
 
 
 class TransferConnection(BaseModel):
@@ -33,6 +35,12 @@ class TransferConnection(BaseModel):
     wait_time_minutes: int
     is_safe: bool = True
     delay_risk_warning: Optional[str] = None
+    arrival_platform: Optional[str] = Field(default="PF 2", description="Arrival platform for incoming train")
+    departure_platform: Optional[str] = Field(default="PF 4", description="Departure platform for connecting train")
+    interchange_guide: Optional[str] = Field(
+        default="Cross via Foot Overbridge (FOB) lift or ramp",
+        description="Navigation guide between platforms",
+    )
 
 
 class JourneyRoute(BaseModel):
