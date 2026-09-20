@@ -10,7 +10,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.api.v1 import search, stations, trains
+from app.api.v1 import availability, search, stations, trains
 
 
 @asynccontextmanager
@@ -60,6 +60,7 @@ app.add_middleware(
 app.include_router(search.router, prefix="/api/v1", tags=["Search"])
 app.include_router(stations.router, prefix="/api/v1", tags=["Stations"])
 app.include_router(trains.router, prefix="/api/v1", tags=["Trains"])
+app.include_router(availability.router, prefix="/api/v1", tags=["Availability"])
 
 
 @app.get("/", tags=["Health"])
