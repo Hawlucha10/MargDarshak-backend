@@ -108,7 +108,7 @@ async def load_stations():
             await session.commit()
             inserted_count += len(records)
 
-    print(f"✅ Successfully ingested {inserted_count} stations into PostGIS!")
+    print(f"[SUCCESS] Ingested {inserted_count} stations into PostGIS!")
 
 
 if __name__ == "__main__":

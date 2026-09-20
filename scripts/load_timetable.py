@@ -96,6 +96,11 @@ async def load_timetable():
 
             arrival = parse_time(row.get("arrival"))
             departure = parse_time(row.get("departure"))
+            day_val = row.get("day")
+            try:
+                day_int = int(day_val) if day_val is not None else 1
+            except (ValueError, TypeError):
+                day_int = 1
 
             records.append({
                 "train_number": str(row.get("train_number", "")).strip(),
@@ -104,8 +109,8 @@ async def load_timetable():
                 "station_name": str(row.get("station_name", "")).strip(),
                 "arrival": arrival,
                 "departure": departure,
-                "day": int(row.get("day", 1)),
-                "stop_sequence": idx % 100,  # approximate sequence if not explicitly numbered
+                "day": day_int,
+                "stop_sequence": idx % 100,
             })
 
             if len(records) >= batch_size:
@@ -120,7 +125,7 @@ async def load_timetable():
             await session.commit()
             inserted_count += len(records)
 
-    print(f"✅ Successfully ingested {inserted_count} timetable records into PostgreSQL!")
+    print(f"[SUCCESS] Ingested {inserted_count} timetable records into PostgreSQL!")
 
 
 if __name__ == "__main__":

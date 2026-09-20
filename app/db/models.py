@@ -20,7 +20,7 @@ from app.db.postgres import Base
 class StationModel(Base):
     __tablename__ = "stations"
 
-    code = Column(String(10), primary_key=True, index=True)
+    code = Column(String(30), primary_key=True, index=True)
     name = Column(String(150), nullable=False, index=True)
     state = Column(String(80), nullable=True)
     zone = Column(String(20), nullable=True, index=True)
@@ -29,18 +29,14 @@ class StationModel(Base):
     lon = Column(Numeric(10, 6), nullable=False)
     geom = Column(Geometry(geometry_type="POINT", srid=4326), nullable=True)
 
-    __table_args__ = (
-        Index("idx_stations_geom", "geom", postgresql_using="gist"),
-    )
-
 
 class TimetableModel(Base):
     __tablename__ = "timetable"
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
-    train_number = Column(String(10), nullable=False, index=True)
+    train_number = Column(String(20), nullable=False, index=True)
     train_name = Column(String(150), nullable=False)
-    station_code = Column(String(10), ForeignKey("stations.code", ondelete="CASCADE"), nullable=False, index=True)
+    station_code = Column(String(30), ForeignKey("stations.code", ondelete="CASCADE"), nullable=False, index=True)
     station_name = Column(String(150), nullable=True)
     arrival = Column(Time, nullable=True)
     departure = Column(Time, nullable=True)

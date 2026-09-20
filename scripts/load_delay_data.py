@@ -64,7 +64,11 @@ async def load_delay_data(sample_limit: int | None = 100000):
                 })
 
             if records:
-                await session.execute(insert(DelayRecordModel).values(records))
+                # asyncpg limit is 32767 parameters. 1000 rows * 14 columns = 14000 params (safe)
+                sub_batch_size = 1000
+                for i in range(0, len(records), sub_batch_size):
+                    sub = records[i : i + sub_batch_size]
+                    await session.execute(insert(DelayRecordModel).values(sub))
                 await session.commit()
                 total_loaded += len(records)
                 print(f"Ingested {total_loaded} delay records...")
@@ -73,7 +77,7 @@ async def load_delay_data(sample_limit: int | None = 100000):
                 print(f"Reached sample limit of {sample_limit} records.")
                 break
 
-    print(f"✅ Successfully ingested {total_loaded} delay records into PostgreSQL!")
+    print(f"[SUCCESS] Ingested {total_loaded} delay records into PostgreSQL!")
 
 
 if __name__ == "__main__":
