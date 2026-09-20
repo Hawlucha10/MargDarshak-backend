@@ -69,8 +69,8 @@ async def search_routes(request: RouteSearchRequest):
         zone="NR",
         distance_km=850,
     )
-    predicted_delay = pred_res["predicted_delay_minutes"]
-    risk_warning = " ".join(pred_res["explanations"]) if pred_res["explanations"] else None
+    predicted_delay = int(round(pred_res.get("predicted_delay_minutes", 0)))
+    risk_warning = " ".join(pred_res["explanations"]) if pred_res.get("explanations") else None
 
     # 3. Weather Hazard Inspection (IMD alerts)
     weather_audit = weather_router.inspect_route_weather(
