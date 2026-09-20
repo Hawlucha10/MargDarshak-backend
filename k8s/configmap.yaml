@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: margdarshak-config
+  namespace: default
+data:
+  API_HOST: "0.0.0.0"
+  API_PORT: "8000"
+  API_RELOAD: "false"
+  POSTGRES_HOST: "postgres-cluster.database.svc.cluster.local"
+  POSTGRES_PORT: "5432"
+  POSTGRES_DB: "margdarshak_prod"
+  REDIS_HOST: "redis-cluster.cache.svc.cluster.local"
+  REDIS_PORT: "6379"
+  CORS_ORIGINS: "https://margdarshak.in,https://app.margdarshak.in"
+  RSCFOSS_API_URL: "https://api.rscfoss.com"

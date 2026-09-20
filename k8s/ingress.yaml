@@ -1,0 +1,28 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: margdarshak-ingress
+  namespace: default
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/limit-rps: "100"  # Rate limiting protection
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "10"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+spec:
+  tls:
+    - hosts:
+        - api.margdarshak.in
+      secretName: margdarshak-tls-cert
+  rules:
+    - host: api.margdarshak.in
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: margdarshak-api-svc
+                port:
+                  number: 80

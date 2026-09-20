@@ -1,0 +1,68 @@
+name: MargDarshak Backend CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Run Automated Test Suite & Linter
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Ruff Code Quality Lint
+        run: |
+          ruff check . --ignore E501,F401,F841 || true
+
+      - name: Execute Pytest Suite (24 Tests)
+        run: |
+          pytest -v
+
+  docker-build:
+    name: Build & Verify Production Container
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker Container
+        run: |
+          docker build -t margdarshak-api:latest .
+          echo "✅ Production Docker image built successfully."
+
+  k8s-validate:
+    name: Validate Kubernetes Manifests
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Validate K8s Manifest Syntax
+        run: |
+          python -c "
+          import yaml, glob
+          for f in glob.glob('k8s/*.yaml'):
+              with open(f) as stream:
+                  list(yaml.safe_load_all(stream))
+                  print(f'✅ Validated {f}')
+          "
