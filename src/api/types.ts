@@ -4,6 +4,7 @@ export interface StationItem {
   state?: string;
   zone?: string;
   distance_km?: number;
+  is_hub?: boolean;
 }
 
 export interface TrainLeg {

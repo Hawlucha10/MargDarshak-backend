@@ -51,9 +51,33 @@ export const CITY_NEARBY_HUBS: Record<string, StationItem[]> = {
   ],
 };
 
+export async function getPopularStations(): Promise<StationItem[]> {
+  try {
+    const res = await fetch(`${API_BASE}/stations/popular?limit=10`);
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (err) {
+    console.warn('Failed to fetch popular stations, using fallback:', err);
+  }
+
+  return [
+    { code: 'NDLS', name: 'NEW DELHI', zone: 'NR', state: 'Delhi', is_hub: true },
+    { code: 'GWL', name: 'GWALIOR JN', zone: 'NCR', state: 'Madhya Pradesh', is_hub: true },
+    { code: 'PUNE', name: 'PUNE JN', zone: 'CR', state: 'Maharashtra', is_hub: true },
+    { code: 'CSTM', name: 'MUMBAI CST', zone: 'CR', state: 'Maharashtra', is_hub: true },
+    { code: 'BPL', name: 'BHOPAL JN', zone: 'WCR', state: 'Madhya Pradesh', is_hub: true },
+    { code: 'HWH', name: 'HOWRAH JN', zone: 'ER', state: 'West Bengal', is_hub: true },
+    { code: 'SBC', name: 'KSR BENGALURU', zone: 'SWR', state: 'Karnataka', is_hub: true },
+    { code: 'MAS', name: 'MGR CHENNAI CTL', zone: 'SR', state: 'Tamil Nadu', is_hub: true },
+  ];
+}
+
 export async function searchStations(query: string): Promise<StationItem[]> {
   const cleanQ = query.trim().toLowerCase();
-  if (cleanQ.length < 2) return [];
+  if (!cleanQ) {
+    return getPopularStations();
+  }
 
   // Check city satellite suggestions first
   const nearbyHubs = CITY_NEARBY_HUBS[cleanQ] || CITY_NEARBY_HUBS[cleanQ.replace(/\s+/g, '_')];
@@ -62,10 +86,12 @@ export async function searchStations(query: string): Promise<StationItem[]> {
   }
 
   try {
-    const res = await fetch(`${API_BASE}/stations/search?q=${encodeURIComponent(query)}`);
+    const res = await fetch(`${API_BASE}/stations/search?q=${encodeURIComponent(query)}&limit=15`);
     if (res.ok) {
       const data = await res.json();
-      return data;
+      if (Array.isArray(data) && data.length > 0) {
+        return data;
+      }
     }
   } catch (err) {
     console.warn('Backend station search error, using fallback:', err);
@@ -73,17 +99,19 @@ export async function searchStations(query: string): Promise<StationItem[]> {
 
   // Fallback known stations for offline robustness
   const fallbackList: StationItem[] = [
-    { code: 'GWL', name: 'Gwalior Junction', state: 'Madhya Pradesh' },
-    { code: 'PUNE', name: 'Pune Junction', state: 'Maharashtra' },
-    { code: 'NDLS', name: 'New Delhi', state: 'Delhi' },
-    { code: 'BPL', name: 'Bhopal Junction', state: 'Madhya Pradesh' },
-    { code: 'JHS', name: 'Jhansi Junction', state: 'Uttar Pradesh' },
-    { code: 'BINA', name: 'Bina Junction', state: 'Madhya Pradesh' },
-    { code: 'BSL', name: 'Bhusaval Junction', state: 'Maharashtra' },
-    { code: 'MMR', name: 'Manmad Junction', state: 'Maharashtra' },
-    { code: 'CSMT', name: 'Mumbai CSMT', state: 'Maharashtra' },
-    { code: 'HWH', name: 'Howrah Junction', state: 'West Bengal' },
-    { code: 'CNB', name: 'Kanpur Central', state: 'Uttar Pradesh' },
+    { code: 'GWL', name: 'GWALIOR JN', zone: 'NCR', state: 'Madhya Pradesh', is_hub: true },
+    { code: 'PUNE', name: 'PUNE JN', zone: 'CR', state: 'Maharashtra', is_hub: true },
+    { code: 'NDLS', name: 'NEW DELHI', zone: 'NR', state: 'Delhi', is_hub: true },
+    { code: 'BPL', name: 'BHOPAL JN', zone: 'WCR', state: 'Madhya Pradesh', is_hub: true },
+    { code: 'CSTM', name: 'MUMBAI CST', zone: 'CR', state: 'Maharashtra', is_hub: true },
+    { code: 'HWH', name: 'HOWRAH JN', zone: 'ER', state: 'West Bengal', is_hub: true },
+    { code: 'SBC', name: 'KSR BENGALURU', zone: 'SWR', state: 'Karnataka', is_hub: true },
+    { code: 'MAS', name: 'MGR CHENNAI CTL', zone: 'SR', state: 'Tamil Nadu', is_hub: true },
+    { code: 'CNB', name: 'KANPUR CENTRAL', zone: 'NCR', state: 'Uttar Pradesh', is_hub: true },
+    { code: 'JHS', name: 'JHANSI JN', zone: 'NCR', state: 'Uttar Pradesh' },
+    { code: 'BINA', name: 'BINA JN', zone: 'WCR', state: 'Madhya Pradesh' },
+    { code: 'BSL', name: 'BHUSAVAL JN', zone: 'CR', state: 'Maharashtra' },
+    { code: 'MMR', name: 'MANMAD JN', zone: 'CR', state: 'Maharashtra' },
   ];
 
   return fallbackList.filter(
