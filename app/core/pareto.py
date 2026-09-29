@@ -61,23 +61,40 @@ def assign_pareto_labels(routes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     if not routes:
         return []
 
+    if len(routes) == 1:
+        r_copy = dict(routes[0])
+        r_copy["label"] = "BALANCED"
+        return [r_copy]
+
     # Find extreme champions
     fastest = min(routes, key=lambda r: r["travel_time_min"])
     cheapest = min(routes, key=lambda r: r["fare"])
     fewest_transfers = min(routes, key=lambda r: r["transfers"])
     most_reliable = max(routes, key=lambda r: r["reliability"])
 
+    # Comfort champion: min comfort_score or wait_time_min
+    most_comfortable = min(
+        routes,
+        key=lambda r: r.get("comfort_score", r["travel_time_min"] + 3.0 * r.get("wait_time_min", 0))
+    )
+
+    # Multimodal champion: fastest multimodal route
+    multimodal_candidates = [r for r in routes if r.get("is_multimodal")]
+    multimodal_fastest = min(multimodal_candidates, key=lambda r: r["travel_time_min"]) if multimodal_candidates else None
+
     # Compute min and max for normalization
     min_time = min(r["travel_time_min"] for r in routes)
-    max_time = max(r["travel_time_min"] for r in routes) or min_time + 1
+    max_time = max(r["travel_time_min"] for r in routes)
+    time_range = float(max_time - min_time) if max_time > min_time else 1.0
 
     min_fare = min(r["fare"] for r in routes)
-    max_fare = max(r["fare"] for r in routes) or min_fare + 1
+    max_fare = max(r["fare"] for r in routes)
+    fare_range = float(max_fare - min_fare) if max_fare > min_fare else 1.0
 
     # Balanced score (equal weights)
     def balanced_score(r):
-        norm_time = (r["travel_time_min"] - min_time) / (max_time - min_time)
-        norm_fare = (r["fare"] - min_fare) / (max_fare - min_fare)
+        norm_time = (r["travel_time_min"] - min_time) / time_range
+        norm_fare = (r["fare"] - min_fare) / fare_range
         norm_transfers = r["transfers"] / 3.0
         norm_reliability = 1.0 - r["reliability"]
         return norm_time + norm_fare + norm_transfers + norm_reliability
@@ -90,23 +107,29 @@ def assign_pareto_labels(routes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     for r in routes:
         r_copy = dict(r)
         labels = []
-        if r == fastest and "FASTEST" not in assigned_labels:
+        if multimodal_fastest and r is multimodal_fastest and "MULTIMODAL_FASTEST" not in assigned_labels:
+            labels.append("MULTIMODAL_FASTEST")
+            assigned_labels.add("MULTIMODAL_FASTEST")
+        if r is fastest and "FASTEST" not in assigned_labels:
             labels.append("FASTEST")
             assigned_labels.add("FASTEST")
-        if r == cheapest and "CHEAPEST" not in assigned_labels:
+        if r is most_comfortable and r.get("transfers", 0) > 0 and "COMFORT_HOMESTAY" not in assigned_labels:
+            labels.append("COMFORT_HOMESTAY")
+            assigned_labels.add("COMFORT_HOMESTAY")
+        if r is cheapest and "CHEAPEST" not in assigned_labels:
             labels.append("CHEAPEST")
             assigned_labels.add("CHEAPEST")
-        if r == fewest_transfers and "FEWEST_TRANSFERS" not in assigned_labels:
+        if r is fewest_transfers and "FEWEST_TRANSFERS" not in assigned_labels:
             labels.append("FEWEST_TRANSFERS")
             assigned_labels.add("FEWEST_TRANSFERS")
-        if r == most_reliable and "MOST_RELIABLE" not in assigned_labels:
+        if r is most_reliable and "MOST_RELIABLE" not in assigned_labels:
             labels.append("MOST_RELIABLE")
             assigned_labels.add("MOST_RELIABLE")
-        if r == balanced and "BALANCED" not in assigned_labels:
+        if r is balanced and "BALANCED" not in assigned_labels:
             labels.append("BALANCED")
             assigned_labels.add("BALANCED")
 
-        r_copy["label"] = labels[0] if labels else "ALTERNATIVE"
+        r_copy["label"] = labels[0] if labels else ("MULTIMODAL" if r.get("is_multimodal") else "ALTERNATIVE")
         labeled_routes.append(r_copy)
 
     return labeled_routes

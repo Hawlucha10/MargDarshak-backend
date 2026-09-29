@@ -12,6 +12,7 @@ router = APIRouter()
 
 
 @router.get("/stations/search", response_model=List[StationSearchResult])
+@router.get("/stations/autocomplete", response_model=List[StationSearchResult])
 async def search_stations(
     q: Optional[str] = Query(None, description="Station name, code, or city (e.g. GWL, Gwalior, NDLS, Delhi, Noida)"),
     limit: int = Query(15, ge=1, le=50),

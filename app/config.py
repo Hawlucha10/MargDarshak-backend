@@ -36,8 +36,14 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expiry_minutes: int = 60
 
-    # External APIs
+    # Railway Provider (CRIS_SIMULATOR or CRIS_PRODUCTION)
+    railway_provider: str = "CRIS_SIMULATOR"
+
+    # External APIs (CRIS_PRODUCTION mode)
     rscfoss_api_url: str = "https://api.rscfoss.com"
+    rapidapi_key: str = "b2915a7aa0msh8c3cf4533c0616cp18ddaajsn34a0acd9268b"
+    rapidapi_host: str = "railkit-indian-railway-data.p.rapidapi.com"
+
 
     @property
     def postgres_url(self) -> str:

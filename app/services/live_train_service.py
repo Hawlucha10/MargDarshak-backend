@@ -7,15 +7,19 @@ Backed by PostGIS timetable queries, ML delay prediction, and 60-second Redis ca
 import datetime
 import json
 import math
+import re
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
+import httpx
 from sqlalchemy import text
 
+from app.config import get_settings
 from app.db.postgres import get_session_maker
 from app.db.redis_client import get_redis
 from app.ml.delay_predictor import get_predictor
 from app.schemas.train import TrainLiveStatus, TrainScheduleResponse, TrainStop
+
 
 
 def _time_str_to_minutes(t_val: Any) -> int:
@@ -152,17 +156,188 @@ def _generate_fallback_stops(train_number: str) -> List[Dict[str, Any]]:
     return result
 
 
-async def get_live_train_status(train_number: str) -> TrainLiveStatus:
+async def _fetch_railkit_live_tracking(
+    train_number: str, travel_date: Optional[str] = None
+) -> Tuple[bool, Optional[Any], Optional[str]]:
     """
-    Retrieve live running status for a train.
-    Checks 60s Redis cache first.
-    If cache miss: computes real-time location along scheduled route,
-    evaluates ML predicted delay, and calculates telemetry progress.
+    Calls the RailKit live tracking endpoint:
+    GET https://railkit-indian-railway-data.p.rapidapi.com/api/trackTrain/{trainNumber}/{date}
     """
-    clean_num = train_number.strip()
-    cache_key = f"train:live:{clean_num}"
+    settings = get_settings()
+    if not settings.rapidapi_key:
+        return False, None, "RapidAPI key not configured."
 
-    # 1. Redis Cache Check (60-second TTL)
+    now = datetime.datetime.now()
+    if not travel_date:
+        formatted_date = now.strftime("%d-%m-%Y")
+    else:
+        parts = travel_date.split("-")
+        if len(parts[0]) == 4:
+            formatted_date = f"{parts[2]}-{parts[1]}-{parts[0]}"
+        else:
+            formatted_date = travel_date
+
+    clean_train = train_number.strip()
+    url = f"https://{settings.rapidapi_host}/api/trackTrain/{clean_train}/{formatted_date}"
+    headers = {
+        "x-rapidapi-key": settings.rapidapi_key,
+        "x-rapidapi-host": settings.rapidapi_host,
+        "Content-Type": "application/json",
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            resp = await client.get(url, headers=headers)
+            if resp.status_code == 200:
+                data = resp.json()
+                if isinstance(data, dict):
+                    msg = data.get("message", "")
+                    if msg and ("quota" in msg.lower() or "exceeded" in msg.lower()):
+                        return False, None, msg
+                return True, data, None
+            elif resp.status_code == 429:
+                return False, None, "RapidAPI quota limit reached."
+            else:
+                return False, None, f"HTTP {resp.status_code}"
+    except Exception as e:
+        return False, None, str(e)
+
+
+def _parse_railkit_live_tracking(train_number: str, data: Dict[str, Any]) -> Optional[TrainLiveStatus]:
+    """Parse RailKit live tracking response into TrainLiveStatus."""
+    if not isinstance(data, dict):
+        return None
+    data_dict = data.get("data")
+    if not isinstance(data_dict, dict):
+        return None
+
+    stations = data_dict.get("stations", [])
+    if not stations:
+        return None
+
+    train_name = f"Express {train_number}"
+    stoppages = [s for s in stations if s.get("type") == "stoppage"]
+    all_stations = stoppages if len(stoppages) >= 2 else stations
+
+    # Find current station and next station
+    curr_station = all_stations[0]
+    next_station = all_stations[1] if len(all_stations) > 1 else all_stations[0]
+    curr_idx = 0
+
+    for idx, s in enumerate(all_stations):
+        st = s.get("status", "")
+        if st in ["departed", "arrived"]:
+            curr_station = s
+            curr_idx = idx
+            if idx + 1 < len(all_stations):
+                next_station = all_stations[idx + 1]
+            else:
+                next_station = s
+
+    # Parse delay minutes
+    delay_str = ""
+    if next_station.get("arrival", {}).get("delay"):
+        delay_str = str(next_station["arrival"]["delay"])
+    elif curr_station.get("departure", {}).get("delay"):
+        delay_str = str(curr_station["departure"]["delay"])
+
+    delay_minutes = 0
+    if "on time" in delay_str.lower():
+        delay_minutes = 0
+    else:
+        nums = re.findall(r'\d+', delay_str)
+        if nums:
+            delay_minutes = int(nums[0])
+
+    if delay_minutes <= 10:
+        delay_status = "ON TIME"
+        delay_trend = "stable"
+    elif delay_minutes <= 30:
+        delay_status = "SLIGHT DELAY"
+        delay_trend = "recovering"
+    elif delay_minutes <= 60:
+        delay_status = "MODERATE DELAY"
+        delay_trend = "stable"
+    else:
+        delay_status = "CRITICAL DELAY"
+        delay_trend = "accumulating"
+
+    eta_str = next_station.get("arrival", {}).get("actual") or next_station.get("arrival", {}).get("scheduled") or "On Time"
+
+    total_count = max(1, len(all_stations))
+    journey_pct = int(round((curr_idx / max(1, total_count - 1)) * 100))
+
+    try:
+        total_dist = int(all_stations[-1].get("distanceKm", 0))
+    except Exception:
+        total_dist = 500
+
+    try:
+        travelled_dist = int(curr_station.get("distanceKm", 0))
+    except Exception:
+        travelled_dist = int(round(total_dist * (journey_pct / 100.0)))
+
+    timeline: List[TrainStop] = []
+    for idx, s in enumerate(all_stations):
+        s_code = s.get("stationCode", "")
+        s_name = s.get("stationName", "")
+        sched_arr = s.get("arrival", {}).get("scheduled")
+        sched_dep = s.get("departure", {}).get("scheduled")
+        act_arr = s.get("arrival", {}).get("actual")
+        act_dep = s.get("departure", {}).get("actual")
+        has_passed = s.get("status") in ["departed", "arrived"]
+        s_dist = int(s.get("distanceKm", 0)) if str(s.get("distanceKm", "")).isdigit() else idx * 50
+
+        st_del_str = str(s.get("arrival", {}).get("delay") or s.get("departure", {}).get("delay") or "")
+        st_delay = 0
+        if "on time" not in st_del_str.lower():
+            n = re.findall(r'\d+', st_del_str)
+            if n:
+                st_delay = int(n[0])
+
+        timeline.append(
+            TrainStop(
+                station_code=s_code,
+                station_name=s_name,
+                arrival=sched_arr,
+                departure=sched_dep,
+                day=1,
+                stop_sequence=idx + 1,
+                distance_km=s_dist,
+                delay_minutes=st_delay,
+                actual_arrival=act_arr,
+                actual_departure=act_dep,
+                has_passed=has_passed,
+            )
+        )
+
+    return TrainLiveStatus(
+        train_number=train_number,
+        train_name=train_name,
+        current_station=curr_station.get("stationCode", ""),
+        current_station_name=curr_station.get("stationName", ""),
+        delay_minutes=delay_minutes,
+        delay_status=delay_status,
+        delay_trend=delay_trend,
+        next_stop=next_station.get("stationCode", ""),
+        next_stop_name=next_station.get("stationName", ""),
+        eta=eta_str,
+        journey_percent=journey_pct,
+        distance_travelled_km=travelled_dist,
+        total_distance_km=total_dist,
+        station_timeline=timeline,
+        updated_at="Live GPS / PRS",
+        source="railkit_live_tracking_api",
+        cached=False,
+    )
+
+
+async def get_live_train_status(train_number: str, travel_date: Optional[str] = None) -> TrainLiveStatus:
+    """Retrieve live running status for a train via the active RailwayGateway."""
+    from app.services.gateway import get_railway_gateway
+    return await get_railway_gateway().get_live_train_status(train_number, travel_date)
+
+    # 1. Redis Cache Check (120-second TTL to conserve API quota)
     try:
         redis = get_redis()
         cached_data = await redis.get(cache_key)
@@ -173,10 +348,23 @@ async def get_live_train_status(train_number: str) -> TrainLiveStatus:
     except Exception:
         pass
 
-    # 2. Fetch Schedule Stops
+    # 2. Query RailKit RapidAPI live tracking endpoint
+    api_success, api_data, error_msg = await _fetch_railkit_live_tracking(clean_num, travel_date)
+    if api_success and api_data:
+        live_status = _parse_railkit_live_tracking(clean_num, api_data)
+        if live_status:
+            try:
+                redis = get_redis()
+                await redis.set(cache_key, live_status.model_dump_json(), ex=120)
+            except Exception:
+                pass
+            return live_status
+
+    # 3. Fallback to Local Timetable + ML Delay Prediction if API unavailable
     stops_data = await fetch_train_stops_db(clean_num)
     if not stops_data:
         stops_data = _generate_fallback_stops(clean_num)
+
 
     train_name = stops_data[0].get("train_name", f"Express {clean_num}")
     total_stops = len(stops_data)
@@ -288,11 +476,9 @@ async def get_live_train_status(train_number: str) -> TrainLiveStatus:
 
 
 async def get_train_schedule(train_number: str) -> TrainScheduleResponse:
-    """Retrieve full station timetable for a train."""
-    clean_num = train_number.strip()
-    stops_data = await fetch_train_stops_db(clean_num)
-    if not stops_data:
-        stops_data = _generate_fallback_stops(clean_num)
+    """Retrieve full station timetable for a train via active RailwayGateway."""
+    from app.services.gateway import get_railway_gateway
+    return await get_railway_gateway().get_train_schedule(train_number)
 
     train_name = stops_data[0].get("train_name", f"Express {clean_num}")
     origin_code = stops_data[0]["station_code"]

@@ -1,16 +1,12 @@
-"""
-Tier-2 Real-Time Seat Availability & Quota Arbitrage Service.
-Evaluates multi-class seat status, calculates Bayesian/logistic Waitlist Confirmation Probabilities,
-identifies upstream quota arbitrage opportunities, and audits multi-leg route feasibility.
-Backed by 5-minute (300s) Redis caching.
-"""
-
 import asyncio
 import datetime
 import json
 import math
 from typing import Any, Dict, List, Optional, Tuple
 
+import httpx
+
+from app.config import get_settings
 from app.core.demand_buffer import get_demand_adaptive_buffer
 from app.core.quota_arbitrage import find_cross_quota_arbitrage
 from app.db.redis_client import get_redis
@@ -30,11 +26,8 @@ from app.services.live_train_service import fetch_train_stops_db, _generate_fall
 def _calculate_class_fares(distance_km: int) -> Dict[str, int]:
     """
     Calculate Indian Railways telescopic distance-slab fares across classes.
-    Applies distance discounting for long-haul journeys (>500km, >1000km).
     """
     d = max(50, distance_km)
-    
-    # Distance scale factor (telescopic taper)
     if d > 1200:
         dist_factor = 0.82
     elif d > 800:
@@ -56,30 +49,65 @@ def _calculate_class_fares(distance_km: int) -> Dict[str, int]:
     return fares
 
 
-def _compute_confirmation_probability(status: str, queue_num: int) -> Tuple[Optional[float], Optional[str]]:
+def _format_date_for_api(date_str: str) -> str:
+    """Ensure date is in DD-MM-YYYY format expected by RapidAPI."""
+    try:
+        if "-" in date_str:
+            parts = date_str.split("-")
+            if len(parts[0]) == 4:  # YYYY-MM-DD -> DD-MM-YYYY
+                return f"{parts[2]}-{parts[1]}-{parts[0]}"
+    except Exception:
+        pass
+    return date_str
+
+
+async def _fetch_railkit_availability(
+    train_number: str,
+    source: str,
+    destination: str,
+    travel_date: str,
+    class_type: str = "SL",
+    quota: str = "GN",
+) -> Tuple[bool, Optional[Any], Optional[str]]:
     """
-    Calculates Bayesian / logistic waitlist confirmation probability:
-    P = 1 / (1 + exp(k * (WL - threshold)))
+    Calls the RailKit RapidAPI endpoint:
+    GET https://railkit-indian-railway-data.p.rapidapi.com/api/getAvailability/{train}/{from}/{to}/{date}/{class}/{quota}
     """
-    st = status.upper()
-    if st == "AVAILABLE":
-        return 1.0, "100%"
-    if st == "RAC":
-        # RAC passengers are guaranteed boarding and have >95% probability of full berth allocation
-        prob = round(max(0.92, 0.99 - (queue_num * 0.003)), 2)
-        return prob, f"{int(prob * 100)}%"
-    if st == "WL":
-        # Logistic curve calibrated on Indian Railways historical clearing trends
-        # Center threshold = 25 waitlist, steepness k = 0.08
-        k = 0.08
-        threshold = 25
-        z = k * (queue_num - threshold)
-        prob = 1.0 / (1.0 + math.exp(z))
-        prob = round(max(0.05, min(0.94, prob)), 2)
-        return prob, f"{int(prob * 100)}%"
-    if st == "REGRET":
-        return 0.0, "0%"
-    return None, None
+    settings = get_settings()
+    if not settings.rapidapi_key:
+        return False, None, "RapidAPI key not configured."
+
+    formatted_date = _format_date_for_api(travel_date)
+    clean_train = train_number.strip()
+    clean_from = source.upper().strip()
+    clean_to = destination.upper().strip()
+    clean_class = class_type.upper().strip() if class_type else "SL"
+    clean_quota = quota.upper().strip() if quota else "GN"
+
+    url = f"https://{settings.rapidapi_host}/api/getAvailability/{clean_train}/{clean_from}/{clean_to}/{formatted_date}/{clean_class}/{clean_quota}"
+
+    headers = {
+        "x-rapidapi-key": settings.rapidapi_key,
+        "x-rapidapi-host": settings.rapidapi_host,
+        "Content-Type": "application/json",
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            resp = await client.get(url, headers=headers)
+            if resp.status_code == 200:
+                data = resp.json()
+                if isinstance(data, dict):
+                    msg = data.get("message", "")
+                    if msg and ("quota" in msg.lower() or "exceeded" in msg.lower()):
+                        return False, None, msg
+                return True, data, None
+            elif resp.status_code == 429:
+                return False, None, "RapidAPI monthly quota limit reached."
+            else:
+                return False, None, f"HTTP {resp.status_code}"
+    except Exception as e:
+        return False, None, str(e)
 
 
 async def get_train_seat_availability(
@@ -88,19 +116,36 @@ async def get_train_seat_availability(
     to_station: str,
     travel_date: str,
     quota: str = "GN",
+    travel_class: str = "SL",
 ) -> TrainAvailabilityResponse:
-    """
-    Evaluates real-time multi-class seat availability and upstream quota arbitrage.
-    Results are cached in Redis with a 300-second (5 min) TTL.
-    """
+    """Retrieve seat availability via the active RailwayGateway (Digital Twin or CRIS Production)."""
+    from app.services.gateway import get_railway_gateway
+    return await get_railway_gateway().get_train_seat_availability(
+        train_number, from_station, to_station, travel_date, quota, travel_class
+    )
+
+
+async def _direct_railkit_train_availability(
+    train_number: str,
+    from_station: str,
+    to_station: str,
+    travel_date: str,
+    quota: str = "GN",
+    travel_class: str = "SL",
+) -> TrainAvailabilityResponse:
+    """Direct RailKit RapidAPI caller."""
+    import re
+
     clean_num = train_number.strip()
     from_code = from_station.upper().strip()
     to_code = to_station.upper().strip()
     clean_quota = quota.upper().strip()
+    clean_class = travel_class.upper().strip() if travel_class else "SL"
+    formatted_date = _format_date_for_api(travel_date)
 
-    cache_key = f"avail:{clean_num}:{from_code}:{to_code}:{travel_date}:{clean_quota}"
+    cache_key = f"avail:{clean_num}:{from_code}:{to_code}:{travel_date}:{clean_class}:{clean_quota}"
 
-    # 1. Redis Cache Check (300-second TTL)
+    # 1. Redis Cache Check (600-second TTL to conserve user quota)
     try:
         redis = get_redis()
         cached_data = await redis.get(cache_key)
@@ -111,162 +156,159 @@ async def get_train_seat_availability(
     except Exception:
         pass
 
-    # 2. Fetch train stops to determine corridor sequence and route distance
+    # 2. Fetch train details
     stops_data = await fetch_train_stops_db(clean_num)
     if not stops_data:
         stops_data = _generate_fallback_stops(clean_num)
 
-    train_name = stops_data[0].get("train_name", f"Express {clean_num}")
-    stop_codes = [s["station_code"].upper() for s in stops_data]
+    train_name = stops_data[0].get("train_name", f"Express {clean_num}") if stops_data else f"Express {clean_num}"
 
-    # Calculate approximate distance between origin and destination
-    from_idx = stop_codes.index(from_code) if from_code in stop_codes else 0
-    to_idx = stop_codes.index(to_code) if to_code in stop_codes else len(stop_codes) - 1
-    hop_count = max(1, abs(to_idx - from_idx))
-    est_distance_km = hop_count * 95
-
-    # 3. Demand Assessment (Festival & Days Until Departure)
-    demand_info = get_demand_adaptive_buffer(travel_date)
-    is_high_demand = demand_info.get("is_peak_demand", False)
-
-    try:
-        travel_dt = datetime.datetime.strptime(travel_date, "%Y-%m-%d").date()
-        days_out = (travel_dt - datetime.date.today()).days
-    except Exception:
-        days_out = 14
-
-    fares = _calculate_class_fares(est_distance_km)
-
-    # 4. Generate Realistic Multi-Class Availability
-    # Available classes on typical Indian Express: SL, 3A, 2A, 1A, 2S
-    class_specs = [
-        ("SL", "Sleeper Class", 120),
-        ("3E", "AC 3 Economy", 80),
-        ("3A", "AC 3 Tier", 64),
-        ("2A", "AC 2 Tier", 46),
-        ("1A", "AC First Class", 18),
-        ("2S", "Second Sitting", 100),
-    ]
+    # 3. Call RailKit RapidAPI
+    api_success, api_data, error_msg = await _fetch_railkit_availability(
+        train_number=clean_num,
+        source=from_code,
+        destination=to_code,
+        travel_date=travel_date,
+        class_type=clean_class,
+        quota=clean_quota,
+    )
 
     classes_output: List[ClassAvailabilityInfo] = []
 
-    for c_code, c_name, base_capacity in class_specs:
-        fare = fares.get(c_code, 500)
+    # Attempt to parse classes from live API response if available
+    if api_success and api_data:
+        # Dedicated handler for RailKit structure:
+        # {"success": true, "data": {"train": ..., "fare": ..., "availability": [...]}}
+        if isinstance(api_data, dict) and api_data.get("success") is True and isinstance(api_data.get("data"), dict):
+            data_dict = api_data["data"]
+            if "availability" in data_dict:
+                train_meta = data_dict.get("train", {})
+                fare_meta = data_dict.get("fare", {})
+                if train_meta.get("trainName"):
+                    train_name = train_meta["trainName"]
+                t_fare = int(fare_meta.get("totalFare") or fare_meta.get("baseFare") or 0)
+                t_class = str(train_meta.get("travelClass") or clean_class)
+                avail_items = data_dict.get("availability", [])
 
-        # Availability status logic based on demand, days out, and quota
-        if clean_quota == "TQ":
-            # Tatkal quota: opens 1 day prior, very competitive
-            if days_out > 1:
-                status = "NOT OPEN"
-                seats = 0
-                is_avbl = False
-            else:
-                status = "AVAILABLE" if not is_high_demand else "WL"
-                seats = 14 if not is_high_demand else 8
-                is_avbl = (status == "AVAILABLE")
-        else:
-            # General Quota
-            if days_out < 3 and is_high_demand:
-                # Last minute peak demand
-                if c_code in ["SL", "3A"]:
-                    status = "WL"
-                    seats = 18 if c_code == "SL" else 11
-                    is_avbl = False
-                elif c_code == "2A":
-                    status = "RAC"
-                    seats = 6
-                    is_avbl = False
-                else:
-                    status = "AVAILABLE"
-                    seats = 4
-                    is_avbl = True
-            elif days_out < 7 and is_high_demand:
-                # Moderate peak demand
-                if c_code == "SL":
-                    status = "RAC"
-                    seats = 9
-                    is_avbl = False
-                elif c_code == "3A":
-                    status = "WL"
-                    seats = 8
-                    is_avbl = False
-                else:
-                    status = "AVAILABLE"
-                    seats = 12
-                    is_avbl = True
-            else:
-                # Standard availability window
-                status = "AVAILABLE"
-                seats = max(5, int(round(base_capacity * (0.15 + (days_out / 60.0)))))
-                is_avbl = True
+                if isinstance(avail_items, list) and avail_items:
+                    chosen_entry = avail_items[0]
+                    for a_item in avail_items:
+                        if isinstance(a_item, dict) and (formatted_date in str(a_item.get("date", "")) or str(a_item.get("date", "")) in formatted_date):
+                            chosen_entry = a_item
+                            break
 
-        conf_prob, conf_prob_str = _compute_confirmation_probability(status, seats)
+                    disp_status = str(chosen_entry.get("availabilityText") or chosen_entry.get("rawStatus") or chosen_entry.get("status") or "AVAILABLE")
+                    if chosen_entry.get("rawStatus") and chosen_entry.get("availabilityText"):
+                        disp_status = f"{chosen_entry['availabilityText']} ({chosen_entry['rawStatus']})"
+                    elif chosen_entry.get("availabilityText"):
+                        disp_status = chosen_entry["availabilityText"]
 
-        classes_output.append(
-            ClassAvailabilityInfo(
-                class_code=c_code,
-                class_name=c_name,
-                status=f"{status} {seats}" if status in ["WL", "RAC"] else f"AVAILABLE - {seats}",
-                available_seats=seats,
-                fare_inr=fare,
-                confirmation_probability=conf_prob,
-                confirmation_probability_pct=conf_prob_str,
-                is_available=is_avbl,
-            )
+                    is_avbl = "AVAILABLE" in disp_status.upper() or "CURR_AVBL" in disp_status.upper()
+
+                    pred_pct = chosen_entry.get("predictionPercentage")
+                    pred_str = chosen_entry.get("prediction")
+                    if pred_pct is not None:
+                        conf_prob = float(pred_pct) / 100.0
+                        conf_str = pred_str or f"{int(pred_pct)}%"
+                    elif is_avbl:
+                        conf_prob = 1.0
+                        conf_str = "100%"
+                    else:
+                        conf_prob = 0.5
+                        conf_str = "50%"
+
+                    nums = re.findall(r'\d+', disp_status)
+                    seats = int(nums[-1]) if nums else 0
+
+                    classes_output.append(
+                        ClassAvailabilityInfo(
+                            class_code=t_class,
+                            class_name=f"Class {t_class}",
+                            status=disp_status,
+                            available_seats=seats,
+                            fare_inr=t_fare,
+                            confirmation_probability=conf_prob,
+                            confirmation_probability_pct=conf_str,
+                            is_available=is_avbl,
+                        )
+                    )
+
+        target_data = api_data
+        if not classes_output and isinstance(api_data, dict) and "data" in api_data and api_data["data"] is not None:
+            target_data = api_data["data"]
+
+        # Fallback Case A: target_data is a list (e.g. date-wise or class-wise entries)
+        if not classes_output and isinstance(target_data, list):
+            for entry in target_data:
+                if not isinstance(entry, dict):
+                    continue
+                e_status = str(entry.get("status") or entry.get("availability") or entry.get("current_status") or "AVAILABLE")
+                e_fare = int(entry.get("fare") or entry.get("total_fare") or 0)
+                e_class = str(entry.get("class") or entry.get("class_type") or clean_class)
+                is_avbl = "AVAILABLE" in e_status.upper() or "CURR_AVBL" in e_status.upper()
+                nums = re.findall(r'\d+', e_status)
+                seats = int(nums[-1]) if nums else 0
+                classes_output.append(
+                    ClassAvailabilityInfo(
+                        class_code=e_class,
+                        class_name=f"Class {e_class}",
+                        status=e_status,
+                        available_seats=seats,
+                        fare_inr=e_fare,
+                        confirmation_probability=1.0 if is_avbl else 0.5,
+                        confirmation_probability_pct="100%" if is_avbl else "50%",
+                        is_available=is_avbl,
+                    )
+                )
+        # Fallback Case B: target_data is a dictionary
+        elif not classes_output and isinstance(target_data, dict):
+            e_status = str(target_data.get("status") or target_data.get("availability") or target_data.get("current_status") or "")
+            if e_status:
+                e_fare = int(target_data.get("fare") or target_data.get("total_fare") or 0)
+                e_class = str(target_data.get("class") or target_data.get("class_type") or clean_class)
+                is_avbl = "AVAILABLE" in e_status.upper() or "CURR_AVBL" in e_status.upper()
+                nums = re.findall(r'\d+', e_status)
+                seats = int(nums[-1]) if nums else 0
+                classes_output.append(
+                    ClassAvailabilityInfo(
+                        class_code=e_class,
+                        class_name=f"Class {e_class}",
+                        status=e_status,
+                        available_seats=seats,
+                        fare_inr=e_fare,
+                        confirmation_probability=1.0 if is_avbl else 0.5,
+                        confirmation_probability_pct="100%" if is_avbl else "50%",
+                        is_available=is_avbl,
+                    )
+                )
+
+
+
+    # 4. If no live data from API: Do NOT generate fake/simulated fallback!
+    # Direct user clearly to IRCTC official website.
+    if not classes_output:
+        irctc_url = f"https://www.irctc.co.in/nget/train-search"
+        response = TrainAvailabilityResponse(
+            train_number=clean_num,
+            train_name=train_name,
+            from_station=from_code,
+            to_station=to_code,
+            travel_date=travel_date,
+            quota=clean_quota,
+            classes=[],
+            arbitrage_recommendation=None,
+            cached=False,
+            checked_at=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            api_status="unavailable",
+            message="Live seat availability via API is currently unavailable. You can check real-time availability and book directly on the official IRCTC website.",
+            irctc_url=irctc_url,
         )
-
-    # 5. Check Upstream Quota Arbitrage Opportunity
-    # Triggered if Sleeper or 3A is waitlisted/RAC from the origin station
-    arbitrage_tip: Optional[QuotaArbitrageTip] = None
-    sl_or_3a_tight = any(
-        c.class_code in ["SL", "3A"] and not c.is_available for c in classes_output
-    )
-
-    if sl_or_3a_tight and from_idx > 0:
-        # Build multi-quota dictionary across route stops
-        multi_quota: Dict[str, Dict[str, Any]] = {}
-        stop_fares: Dict[str, int] = {}
-
-        for idx, st in enumerate(stops_data):
-            code = st["station_code"].upper()
-            st_dist = max(50, abs(to_idx - idx) * 95)
-            stop_fares[code] = _calculate_class_fares(st_dist)["SL"]
-
-            if idx < from_idx:
-                # Upstream stations have fresh quotas (GN / RLGN) with confirmed seats
-                multi_quota[code] = {
-                    "GN": {"status": "AVAILABLE", "seats": 28 + (from_idx - idx) * 4},
-                    "RLGN": {"status": "AVAILABLE", "seats": 16},
-                }
-            elif idx == from_idx:
-                multi_quota[code] = {
-                    "GN": {"status": "WL", "seats": 14},
-                    "RLGN": {"status": "WL", "seats": 8},
-                }
-            else:
-                multi_quota[code] = {
-                    "GN": {"status": "AVAILABLE", "seats": 10},
-                }
-
-        best_arb = find_cross_quota_arbitrage(
-            route_stations=stops_data,
-            user_origin_code=from_code,
-            user_dest_code=to_code,
-            multi_quota_availability=multi_quota,
-            base_fares=stop_fares,
-        )
-
-        if best_arb:
-            arbitrage_tip = QuotaArbitrageTip(
-                upstream_station_code=best_arb["station_code"],
-                upstream_station_name=best_arb["station_name"],
-                quota_type=best_arb["quota_type"],
-                available_seats=best_arb["available_seats"],
-                ticket_fare=best_arb["ticket_fare"],
-                origin_fare=best_arb["origin_fare"],
-                savings_inr=best_arb["fare_difference"],
-                instruction=best_arb["instruction"],
-            )
+        try:
+            redis = get_redis()
+            await redis.set(cache_key, response.model_dump_json(), ex=120)
+        except Exception:
+            pass
+        return response
 
     response = TrainAvailabilityResponse(
         train_number=clean_num,
@@ -276,12 +318,14 @@ async def get_train_seat_availability(
         travel_date=travel_date,
         quota=clean_quota,
         classes=classes_output,
-        arbitrage_recommendation=arbitrage_tip,
+        arbitrage_recommendation=None,
         cached=False,
         checked_at=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        api_status="success",
+        message=None,
+        irctc_url="https://www.irctc.co.in/nget/train-search",
     )
 
-    # 6. Store in Redis Cache (300-second TTL)
     try:
         redis = get_redis()
         await redis.set(cache_key, response.model_dump_json(), ex=300)
@@ -292,13 +336,16 @@ async def get_train_seat_availability(
 
 
 async def check_route_availability(request: RouteAvailabilityRequest) -> RouteAvailabilityResponse:
-    """
-    Audits seat availability across all legs of a multi-hop journey route concurrently.
-    Computes overall confirmation probability and flags broken transfer risks.
-    """
+    """Audit route availability via the active RailwayGateway (Digital Twin or CRIS Production)."""
+    from app.services.gateway import get_railway_gateway
+    return await get_railway_gateway().check_route_availability(request)
+
+
+async def _direct_railkit_route_availability(request: RouteAvailabilityRequest) -> RouteAvailabilityResponse:
+    """Direct RailKit RapidAPI route checker."""
     cache_key = f"route:avail:{request.route_id}"
 
-    # 1. Redis Cache Check (300-second TTL)
+    # 1. Redis Cache Check
     try:
         redis = get_redis()
         cached_data = await redis.get(cache_key)
@@ -317,6 +364,7 @@ async def check_route_availability(request: RouteAvailabilityRequest) -> RouteAv
             to_station=leg.to_station,
             travel_date=leg.travel_date,
             quota=leg.quota,
+            travel_class=leg.travel_class,
         )
         for leg in request.legs
     ]
@@ -326,35 +374,33 @@ async def check_route_availability(request: RouteAvailabilityRequest) -> RouteAv
     legs_results: List[LegAvailabilityResult] = []
     total_fare = 0
     all_confirmed = True
-    min_conf_prob = 1.0
+    any_available = False
     advisories: List[str] = []
 
     for req_leg, avail_res in zip(request.legs, leg_responses):
-        # Match requested class or default to Sleeper (SL)
         matching_class = next(
             (c for c in avail_res.classes if c.class_code == req_leg.travel_class),
             avail_res.classes[0] if avail_res.classes else None,
         )
 
-        fare = matching_class.fare_inr if matching_class else 400
-        status = matching_class.status if matching_class else "AVAILABLE"
-        seats = matching_class.available_seats if matching_class else 10
-        is_conf = matching_class.is_available if matching_class else True
-        conf_prob = matching_class.confirmation_probability if matching_class else 1.0
-
-        if not is_conf:
+        if matching_class:
+            any_available = True
+            fare = matching_class.fare_inr
+            status = matching_class.status
+            seats = matching_class.available_seats
+            is_conf = matching_class.is_available
+            conf_prob = matching_class.confirmation_probability
+            if not is_conf:
+                all_confirmed = False
+        else:
+            fare = 0
+            status = "UNAVAILABLE VIA API"
+            seats = 0
+            is_conf = False
+            conf_prob = None
             all_confirmed = False
-            if conf_prob is not None and conf_prob < min_conf_prob:
-                min_conf_prob = conf_prob
 
         total_fare += fare
-
-        # Add quota arbitrage advice if present
-        if avail_res.arbitrage_recommendation:
-            advisories.append(
-                f"Leg {req_leg.from_station}➔{req_leg.to_station} on Train {req_leg.train_number}: "
-                f"{avail_res.arbitrage_recommendation.instruction}"
-            )
 
         legs_results.append(
             LegAvailabilityResult(
@@ -369,35 +415,52 @@ async def check_route_availability(request: RouteAvailabilityRequest) -> RouteAv
                 fare_inr=fare,
                 confirmation_probability=conf_prob,
                 is_confirmed=is_conf,
-                quota_arbitrage=avail_res.arbitrage_recommendation,
+                quota_arbitrage=None,
+                classes=avail_res.classes,
+                api_status=avail_res.api_status,
+                message=avail_res.message,
+                irctc_url=avail_res.irctc_url,
             )
         )
 
-    # 3. Overall Confirmation Risk Assessment
-    if all_confirmed:
+    # 3. Assess Route Level Status
+    if not any_available:
+        risk_label = "UNAVAILABLE VIA API"
+        api_st = "unavailable"
+        msg = "Live seat availability via API is currently unavailable. You can check each leg on the official IRCTC website."
+        advisories.append("Live seat availability via API is currently unavailable.")
+        advisories.append("Please verify seat availability and book each leg on the official IRCTC website: https://www.irctc.co.in/nget/train-search")
+    elif all_confirmed:
         risk_label = "LOW RISK - 100% Confirmed Berths"
-    elif min_conf_prob >= 0.75:
-        risk_label = f"MODERATE RISK - Waitlisted leg has high clearing probability ({int(min_conf_prob * 100)}%)"
-        advisories.append("One or more legs are in RAC/Waitlist status, but historical trends indicate strong clearing odds.")
+        api_st = "success"
+        msg = None
     else:
-        risk_label = f"HIGH RISK - Low confirmation probability ({int(min_conf_prob * 100)}%)"
-        advisories.append("⚠️ Caution: Missed connection risk if waitlisted leg fails to confirm. We recommend alternative routes or upstream booking.")
+        risk_label = "MODERATE RISK - Check Waitlist on IRCTC"
+        api_st = "partial"
+        msg = "Some legs may have limited availability. Please verify berths on the official IRCTC website before traveling."
+        advisories.append("One or more legs are waitlisted. Please verify status on IRCTC: https://www.irctc.co.in/nget/train-search")
 
     response = RouteAvailabilityResponse(
         route_id=request.route_id,
-        is_fully_confirmed=all_confirmed,
+        is_fully_confirmed=all_confirmed if any_available else False,
         overall_confirmation_risk=risk_label,
         total_fare_inr=total_fare,
         legs=legs_results,
         advisories=advisories,
+        advisory_notes=advisories,
         cached=False,
+        api_status=api_st,
+        message=msg,
+        irctc_url="https://www.irctc.co.in/nget/train-search",
+        joint_confirmation_pct="100%" if (any_available and all_confirmed) else None,
+        joint_confirmation_prob=1.0 if (any_available and all_confirmed) else None,
     )
 
-    # 4. Store in Redis Cache (300-second TTL)
     try:
         redis = get_redis()
-        await redis.set(cache_key, response.model_dump_json(), ex=300)
+        await redis.set(cache_key, response.model_dump_json(), ex=120)
     except Exception:
         pass
 
     return response
+

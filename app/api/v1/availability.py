@@ -11,10 +11,7 @@ from app.schemas.availability import (
     TrainAvailabilityRequest,
     TrainAvailabilityResponse,
 )
-from app.services.availability_service import (
-    check_route_availability as service_check_route_availability,
-    get_train_seat_availability as service_get_train_availability,
-)
+from app.services.gateway import get_railway_gateway
 
 router = APIRouter()
 
@@ -23,15 +20,16 @@ router = APIRouter()
 async def check_train_availability(payload: TrainAvailabilityRequest):
     """
     Tier-2 Real-Time Seat Availability Check for a specific train and corridor.
-    Calculates class-wise berth status, Bayesian waitlist confirmation probabilities,
-    and scans upstream stations for cross-quota arbitrage opportunities.
+    Routed through pluggable RailwayGateway (Digital Twin or Production CRIS).
     """
-    return await service_get_train_availability(
+    gateway = get_railway_gateway()
+    return await gateway.get_train_seat_availability(
         train_number=payload.train_number,
         from_station=payload.from_station,
         to_station=payload.to_station,
         travel_date=payload.travel_date,
         quota=payload.quota,
+        travel_class=payload.travel_class,
     )
 
 
@@ -42,17 +40,21 @@ async def get_train_availability_get(
     to_station: str = Query(..., description="Destination station code, e.g. PUNE"),
     travel_date: str = Query(..., description="Date of travel (YYYY-MM-DD)"),
     quota: str = Query(default="GN", description="Booking quota: GN, TQ, etc."),
+    travel_class: str = Query(default="SL", description="Railway class code: SL, 3A, 2A, 1A, etc."),
 ):
     """
     Convenience GET endpoint for checking single-train multi-class availability.
     """
-    return await service_get_train_availability(
+    gateway = get_railway_gateway()
+    return await gateway.get_train_seat_availability(
         train_number=train_number,
         from_station=from_station,
         to_station=to_station,
         travel_date=travel_date,
         quota=quota,
+        travel_class=travel_class,
     )
+
 
 
 @router.post("/availability/route", response_model=RouteAvailabilityResponse)
@@ -64,4 +66,5 @@ async def check_route_journey_availability(payload: RouteAvailabilityRequest):
     """
     if not payload.legs:
         raise HTTPException(status_code=400, detail="At least one train leg is required")
-    return await service_check_route_availability(payload)
+    gateway = get_railway_gateway()
+    return await gateway.check_route_availability(payload)

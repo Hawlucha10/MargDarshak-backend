@@ -21,6 +21,12 @@ async def lifespan(app: FastAPI):
     print(f"[STARTUP] MargDarshak API starting on {settings.api_host}:{settings.api_port}")
     print(f"[STARTUP] PostgreSQL: {settings.postgres_host}:{settings.postgres_port}/{settings.postgres_db}")
     print(f"[STARTUP] Redis: {settings.redis_host}:{settings.redis_port}")
+    try:
+        from app.ml.delay_predictor import get_predictor
+        get_predictor()
+        print("[STARTUP] Pre-warmed ML Delay Predictor Ensemble successfully")
+    except Exception as e:
+        print(f"[STARTUP] ML pre-warming warning: {e}")
 
     yield  # App is running
 
@@ -42,11 +48,19 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS — allow frontend to call this API
+# CORS — allow frontend to call this API (support localhost, 127.0.0.1 on any port)
 settings = get_settings()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins.split(","),
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+    ],
+    allow_origin_regex=r"https?://.*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

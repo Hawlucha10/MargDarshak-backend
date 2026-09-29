@@ -10,6 +10,8 @@ class TrainAvailabilityRequest(BaseModel):
     to_station: str = Field(..., description="Destination station code, e.g. PUNE", max_length=10)
     travel_date: str = Field(..., description="Date of travel (YYYY-MM-DD)")
     quota: str = Field(default="GN", description="Booking quota: GN (General), TQ (Tatkal), LD (Ladies)")
+    travel_class: str = Field(default="SL", description="Railway class code: SL, 3A, 2A, 1A, 2S, 3E, CC")
+
 
 
 class ClassAvailabilityInfo(BaseModel):
@@ -41,10 +43,13 @@ class TrainAvailabilityResponse(BaseModel):
     to_station: str
     travel_date: str
     quota: str
-    classes: List[ClassAvailabilityInfo]
+    classes: List[ClassAvailabilityInfo] = []
     arbitrage_recommendation: Optional[QuotaArbitrageTip] = None
     cached: bool = False
     checked_at: str = "Just now"
+    api_status: str = Field(default="success", description="'success' or 'unavailable'")
+    message: Optional[str] = None
+    irctc_url: str = Field(default="https://www.irctc.co.in/nget/train-search")
 
 
 class LegAvailabilityRequest(BaseModel):
@@ -70,11 +75,15 @@ class LegAvailabilityResult(BaseModel):
     travel_class: str
     quota: str
     status: str
-    seats: int
-    fare_inr: int
+    seats: int = 0
+    fare_inr: int = 0
     confirmation_probability: Optional[float] = None
-    is_confirmed: bool
+    is_confirmed: bool = False
     quota_arbitrage: Optional[QuotaArbitrageTip] = None
+    classes: List[ClassAvailabilityInfo] = []
+    api_status: str = Field(default="success", description="'success' or 'unavailable'")
+    message: Optional[str] = None
+    irctc_url: str = Field(default="https://www.irctc.co.in/nget/train-search")
 
 
 class RouteAvailabilityResponse(BaseModel):
@@ -83,5 +92,11 @@ class RouteAvailabilityResponse(BaseModel):
     overall_confirmation_risk: str
     total_fare_inr: int
     legs: List[LegAvailabilityResult]
+    advisories: List[str] = []
     advisory_notes: List[str] = []
     cached: bool = False
+    api_status: str = Field(default="success", description="'success', 'partial', or 'unavailable'")
+    message: Optional[str] = None
+    irctc_url: str = Field(default="https://www.irctc.co.in/nget/train-search")
+    joint_confirmation_pct: Optional[str] = None
+    joint_confirmation_prob: Optional[float] = None

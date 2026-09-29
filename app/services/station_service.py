@@ -33,6 +33,37 @@ STATION_ALIASES: Dict[str, str] = {
     "HWH": "HWH",        # Howrah
     "MAS": "MAS",        # Chennai Central
     "SBC": "SBC",        # KSR Bengaluru
+    "IND": "INDB",
+    "INDORE": "INDB",
+    "INDM": "INDB",
+    "JBP": "JBP",
+    "JABALPUR": "JBP",
+    "PRAYAGRAJ": "PRYJ",
+    "ALLAHABAD": "PRYJ",
+    "ALD": "PRYJ",
+    "AYODHYA": "AY",
+    "AYC": "AY",
+    "VARANASI": "BSB",
+    "BANARAS": "BSBS",
+    "MUV": "BSBS",
+    "MUGHALSARAI": "DDU",
+    "MGS": "DDU",
+    "AHMEDABAD": "ADI",
+    "ADIJ": "ADI",
+    "HABIBGANJ": "RKMP",
+    "HBJ": "RKMP",
+    "RANI KAMALAPATI": "RKMP",
+    "SMVT": "SMVB",
+    "SMVT BENGALURU": "SMVB",
+    "BANDRA": "BDTS",
+    "KATRA": "SVDK",
+    "SHIRDI": "SNSI",
+    "HUBLI": "UBL",
+    "MANGALORE": "MAQ",
+    "AMBALA": "UMB",
+    "TATANAGAR": "TATA",
+    "JAMSHEDPUR": "TATA",
+    "BINA": "BINA",
 }
 
 # Major Hub Stations in Metros (Boosted when searching by city name)
@@ -51,14 +82,40 @@ CITY_HUB_MAPPINGS: Dict[str, List[str]] = {
     "madras": ["MAS", "MS"],
     "hyderabad": ["SC", "HYB", "KCG"],
     "secunderabad": ["SC", "HYB", "KCG"],
-    "bhopal": ["BPL", "RKMP", "HBJ", "NSZ"],
-    "ahmedabad": ["ADI", "SBT", "GER"],
-    "jaipur": ["JP", "GADJ", "JPX"],
-    "lucknow": ["LKO", "LJN", "BNZ"],
+    "bhopal": ["BPL", "RKMP", "SHRN", "HBJ"],
+    "indore": ["INDB", "DWX", "UJN"],
+    "jabalpur": ["JBP", "MML", "KTE"],
+    "prayagraj": ["PRYJ", "PCOI", "PRRB"],
+    "allahabad": ["PRYJ", "PCOI", "PRRB"],
+    "varanasi": ["BSB", "BSBS", "DDU"],
+    "banaras": ["BSBS", "BSB", "DDU"],
+    "lucknow": ["LKO", "LJN", "GTNR", "BNZ"],
     "kanpur": ["CNB", "CPA"],
     "patna": ["PNBE", "RJPB", "DNR"],
-    "varanasi": ["BSB", "BSBS", "DDU"],
+    "ahmedabad": ["ADI", "SBT"],
+    "jaipur": ["JP", "GADJ", "JPX"],
     "agra": ["AGC", "AF", "AGA"],
+    "surat": ["ST", "UDN"],
+    "vadodara": ["BRC"],
+    "nagpur": ["NGP", "AJNI"],
+    "amritsar": ["ASR"],
+    "chandigarh": ["CDG"],
+    "shirdi": ["SNSI", "KPG", "MMR"],
+    "katra": ["SVDK", "JAT"],
+    "vaishno devi": ["SVDK", "JAT"],
+    "hubli": ["UBL"],
+    "hubballi": ["UBL"],
+    "mangalore": ["MAJN", "MAQ"],
+    "mangaluru": ["MAJN", "MAQ"],
+    "tatanagar": ["TATA"],
+    "jamshedpur": ["TATA"],
+    "ambala": ["UMB"],
+    "pathankot": ["PTKC"],
+    "aurangabad": ["AWB"],
+    "sambhaji nagar": ["AWB"],
+    "ahmednagar": ["ANG"],
+    "ahilyanagar": ["ANG"],
+    "bina": ["BINA"],
 }
 
 # Satellite Cities (No direct railway station, or users search suburb)
@@ -113,7 +170,7 @@ _CACHE_LOCK = asyncio.Lock()
 
 
 async def initialize_stations() -> None:
-    """Load all stations from PostgreSQL into in-memory fast index."""
+    """Load all stations from PostgreSQL into in-memory fast index, annotated with active timetable stop counts."""
     global _STATIONS_CACHE, _STATIONS_BY_CODE
     if _STATIONS_CACHE:
         return
@@ -125,8 +182,14 @@ async def initialize_stations() -> None:
         try:
             sm = get_session_maker()
             async with sm() as db:
+                # Query all stations
                 result = await db.execute(select(StationModel))
                 db_stations = result.scalars().all()
+
+                # Query active train stop counts per station
+                from sqlalchemy import text
+                counts_res = await db.execute(text("SELECT station_code, count(*) FROM timetable GROUP BY station_code"))
+                stop_counts: Dict[str, int] = {r[0]: r[1] for r in counts_res.fetchall()}
 
                 cache: List[Dict[str, Any]] = []
                 by_code: Dict[str, Dict[str, Any]] = {}
@@ -138,6 +201,7 @@ async def initialize_stations() -> None:
                     state = s.state.strip() if s.state else ""
                     lat = float(s.lat) if s.lat is not None else 0.0
                     lon = float(s.lon) if s.lon is not None else 0.0
+                    stops = stop_counts.get(code, 0)
 
                     item = {
                         "code": code,
@@ -146,7 +210,8 @@ async def initialize_stations() -> None:
                         "state": state,
                         "lat": lat,
                         "lon": lon,
-                        "is_hub": False,
+                        "stop_count": stops,
+                        "is_hub": (stops >= 15),
                     }
                     cache.append(item)
                     by_code[code] = item
@@ -164,7 +229,8 @@ async def initialize_stations() -> None:
 
                 _STATIONS_CACHE = cache
                 _STATIONS_BY_CODE = by_code
-                logger.info("Loaded %d stations into in-memory search index.", len(_STATIONS_CACHE))
+                logger.info("Loaded %d stations into in-memory search index (%d active in timetable).", 
+                            len(_STATIONS_CACHE), len(stop_counts))
         except Exception as e:
             logger.error("Failed to initialize stations cache from database: %s", e)
 
@@ -172,7 +238,7 @@ async def initialize_stations() -> None:
 async def search_stations(query: str, limit: int = 15) -> List[StationSearchResult]:
     """
     Search stations by code prefix, exact code, station name, or city.
-    Yields sorted results matching IRCTC autocomplete behavior.
+    Yields sorted results matching IRCTC autocomplete behavior with active-station prioritization.
     """
     await initialize_stations()
 
@@ -222,7 +288,7 @@ async def search_stations(query: str, limit: int = 15) -> List[StationSearchResu
                 for s in hub_list[:limit]
             ]
 
-    # 2. Check if query is an alias (e.g. CSMT -> CSTM)
+    # 2. Check if query is an alias (e.g. CSMT -> CSTM, IND -> INDB, JBP -> JBP)
     alias_target = STATION_ALIASES.get(q_upper)
     boosted_hub_ranks: Dict[str, int] = {}
     if q_lower in CITY_HUB_MAPPINGS:
@@ -234,45 +300,62 @@ async def search_stations(query: str, limit: int = 15) -> List[StationSearchResu
                 boosted_hub_ranks = {code: idx for idx, code in enumerate(hubs)}
                 break
 
-    scored: List[tuple[int, int, str, Dict[str, Any]]] = []
+    scored: List[tuple[int, int, int, str, str, Dict[str, Any]]] = []
 
     for s in _STATIONS_CACHE:
         code = s["code"]
         name = s["name"]
+        stop_cnt = s.get("stop_count", 0)
         score = 0
 
-        # Exact code match (e.g. 'GWL' == 'GWL')
+        # Exact code match (e.g. 'GWL' == 'GWL', 'JBP' == 'JBP', 'INDB' == 'INDB')
         if code == q_upper:
-            score += 1500
+            score += 3000
         # Alias match (e.g. user typed 'CSMT', station code is 'CSTM')
         elif alias_target and code == alias_target:
-            score += 1400
+            score += 2800
         # Code prefix match (e.g. 'ND' -> 'NDLS')
         elif code.startswith(q_upper):
-            score += 900
+            score += 1000
         # Code contains query
         elif q_upper in code:
             score += 300
 
         # Station name checks
-        if name.startswith(q_upper):
-            score += 700
+        if name == q_upper:
+            score += 2200
+        elif name.startswith(q_upper):
+            score += 850
         elif any(w.startswith(q_upper) for w in name.split()):
             # Word starts with query, e.g. "DELHI" in "NEW DELHI"
-            score += 550
+            score += 650
         elif q_upper in name:
-            score += 200
+            score += 250
 
         # Hub priority boost if city matches
         if code in boosted_hub_ranks:
             rank = boosted_hub_ranks[code]
-            score += max(100, 800 - rank * 60)
+            score += max(250, 1200 - rank * 80)
         elif s.get("is_hub", False) and (q_upper in name or q_upper in code):
-            score += 100
+            score += 200
 
+        # ONLY add active/inactive adjustment if the station actually matched the query!
         if score > 0:
-            # Sort tuple: (-score, length of name for cleaner shorter matches, name)
-            scored.append((-score, len(name), name, s))
+            if stop_cnt > 0:
+                score += 700 + min(stop_cnt, 500)
+            else:
+                score -= 400
+
+            # Sort tuple: (-score, -stop_cnt, length of name, name, code, dict)
+            scored.append((-score, -stop_cnt, len(name), name, s.get("code", ""), s))
+
+    # If active stations matched, filter out 0-stop inactive stations unless exact code match
+    has_active_matches = any(item[5].get("stop_count", 0) > 0 for item in scored)
+    if has_active_matches:
+        scored = [
+            item for item in scored 
+            if item[5].get("stop_count", 0) > 0 or item[5]["code"] == q_upper or (alias_target and item[5]["code"] == alias_target)
+        ]
 
     scored.sort()
 
@@ -280,7 +363,7 @@ async def search_stations(query: str, limit: int = 15) -> List[StationSearchResu
     seen_codes = set()
 
     for item in scored[:limit]:
-        s = item[3]
+        s = item[5]
         if s["code"] not in seen_codes:
             seen_codes.add(s["code"])
             results.append(
