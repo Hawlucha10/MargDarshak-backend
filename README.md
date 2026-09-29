@@ -2,7 +2,6 @@
 ### Next-Gen Editorial Rail & Multimodal Interface
 
 **Architect & Lead Engineer:** Ojas Nagar (`oriio1309` · oriio.1304@gmail.com)  
-**Pitch / Hackathon:** Team `potato_1` · Smart India Hackathon (SIH 2026)  
 **Repository Branch:** [Hawlucha10/MargDarshak-backend (frontend branch)](https://github.com/Hawlucha10/MargDarshak-backend/tree/frontend)  
 **Standalone Remote:** `https://github.com/Hawlucha10/MargDarshak-frontend.git`
 
@@ -63,5 +62,4 @@ Production build compiles cleanly in **< 900 ms** with zero errors.
 
 - **Project**: MargDarshak Frontend Client
 - **Author & Lead Architect**: Ojas Nagar (`oriio1309` · oriio.1304@gmail.com)
-- **Pitched At**: Smart India Hackathon (SIH 2026) · Team `potato_1`
 - **License**: MIT License
