@@ -56,7 +56,7 @@ app/
 
 1. **Adaptive Geometric Route Deflection (AGRD)**:
    Filters out **94.2% of irrelevant stations in $<1\text{ ms}$** using a focal ellipsoidal spatial filter:
-   $$\mathcal{E} = \left\lbrace x \in \mathbb{R}^2 \mid d(S_{\text{origin}}, x) + d(x, S_{\text{dest}}) \le \lambda \cdot d(S_{\text{origin}}, S_{\text{dest}}) \right\rbrace$$
+   $$\mathcal{E} = \lbrace x \in \mathbb{R}^2 \mid d(S_{\text{origin}}, x) + d(x, S_{\text{dest}}) \le \lambda \cdot d(S_{\text{origin}}, S_{\text{dest}}) \rbrace$$
 2. **Round-Based Public Transit Routing (RAPTOR)**:
    Runs multi-label Pareto dynamic programming across 4 dimensions: Duration, Cost, P85 Reliability, and Comfort.
 3. **Tri-Model ML Stacking Delay Prediction**:
@@ -124,5 +124,4 @@ kubectl apply -f k8s/ --dry-run=client
 
 - **Project**: MargDarshak Backend Microservice
 - **Author & Lead Architect**: Ojas Nagar (`oriio1309` · oriio.1304@gmail.com)
-- **Pitched At**: Smart India Hackathon (SIH 2026) · Team `potato_1`
 - **License**: MIT License
