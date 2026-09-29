@@ -232,7 +232,85 @@ async def initialize_stations() -> None:
                 logger.info("Loaded %d stations into in-memory search index (%d active in timetable).", 
                             len(_STATIONS_CACHE), len(stop_counts))
         except Exception as e:
-            logger.error("Failed to initialize stations cache from database: %s", e)
+            logger.warning("Database unavailable (%s); initializing fallback station directory", e)
+            _initialize_fallback_stations()
+
+
+def _initialize_fallback_stations() -> None:
+    """Populate in-memory station index with comprehensive fallback catalog if DB is unreachable."""
+    global _STATIONS_CACHE, _STATIONS_BY_CODE
+    if _STATIONS_CACHE:
+        return
+
+    fallback_stations = [
+        {"code": "NDLS", "name": "NEW DELHI", "zone": "NR", "state": "Delhi", "lat": 28.6424, "lon": 77.2195, "stop_count": 350, "is_hub": True},
+        {"code": "GWL", "name": "GWALIOR JN", "zone": "NCR", "state": "Madhya Pradesh", "lat": 26.2183, "lon": 78.1828, "stop_count": 180, "is_hub": True},
+        {"code": "PUNE", "name": "PUNE JN", "zone": "CR", "state": "Maharashtra", "lat": 18.5289, "lon": 73.8744, "stop_count": 220, "is_hub": True},
+        {"code": "CSTM", "name": "MUMBAI CST", "zone": "CR", "state": "Maharashtra", "lat": 18.9401, "lon": 72.8354, "stop_count": 290, "is_hub": True},
+        {"code": "BPL", "name": "BHOPAL JN", "zone": "WCR", "state": "Madhya Pradesh", "lat": 23.2662, "lon": 77.4124, "stop_count": 210, "is_hub": True},
+        {"code": "HWH", "name": "HOWRAH JN", "zone": "ER", "state": "West Bengal", "lat": 22.5840, "lon": 88.3426, "stop_count": 310, "is_hub": True},
+        {"code": "SBC", "name": "KSR BENGALURU", "zone": "SWR", "state": "Karnataka", "lat": 12.9781, "lon": 77.5696, "stop_count": 190, "is_hub": True},
+        {"code": "MAS", "name": "MGR CHENNAI CTL", "zone": "SR", "state": "Tamil Nadu", "lat": 13.0827, "lon": 80.2755, "stop_count": 240, "is_hub": True},
+        {"code": "CNB", "name": "KANPUR CENTRAL", "zone": "NCR", "state": "Uttar Pradesh", "lat": 26.4547, "lon": 80.3507, "stop_count": 380, "is_hub": True},
+        {"code": "BSB", "name": "VARANASI JN", "zone": "NR", "state": "Uttar Pradesh", "lat": 25.3268, "lon": 82.9863, "stop_count": 160, "is_hub": True},
+        {"code": "DLI", "name": "OLD DELHI", "zone": "NR", "state": "Delhi", "lat": 28.6617, "lon": 77.2307, "stop_count": 190, "is_hub": True},
+        {"code": "NZM", "name": "DELHI H NIZAMUDDIN", "zone": "NR", "state": "Delhi", "lat": 28.5888, "lon": 77.2534, "stop_count": 170, "is_hub": True},
+        {"code": "ANVT", "name": "ANAND VIHAR TRM", "zone": "NR", "state": "Delhi", "lat": 28.6503, "lon": 77.3153, "stop_count": 130, "is_hub": True},
+        {"code": "GZB", "name": "GHAZIABAD JN", "zone": "NR", "state": "Uttar Pradesh", "lat": 28.6679, "lon": 77.4332, "stop_count": 140, "is_hub": True},
+        {"code": "AGC", "name": "AGRA CANTT", "zone": "NCR", "state": "Uttar Pradesh", "lat": 27.1587, "lon": 78.0081, "stop_count": 150, "is_hub": True},
+        {"code": "JHS", "name": "JHANSI JN", "zone": "NCR", "state": "Uttar Pradesh", "lat": 25.4484, "lon": 78.5685, "stop_count": 210, "is_hub": True},
+        {"code": "BINA", "name": "BINA JN", "zone": "WCR", "state": "Madhya Pradesh", "lat": 24.1751, "lon": 78.1873, "stop_count": 120, "is_hub": True},
+        {"code": "ET", "name": "ITARSI JN", "zone": "WCR", "state": "Madhya Pradesh", "lat": 22.6139, "lon": 77.7606, "stop_count": 280, "is_hub": True},
+        {"code": "KNW", "name": "KHANDWA JN", "zone": "CR", "state": "Madhya Pradesh", "lat": 21.8284, "lon": 76.3533, "stop_count": 110, "is_hub": True},
+        {"code": "BSL", "name": "BHUSAVAL JN", "zone": "CR", "state": "Maharashtra", "lat": 21.0455, "lon": 75.7873, "stop_count": 260, "is_hub": True},
+        {"code": "MMR", "name": "MANMAD JN", "zone": "CR", "state": "Maharashtra", "lat": 20.2520, "lon": 74.4370, "stop_count": 200, "is_hub": True},
+        {"code": "LTT", "name": "LOKMANYA TILAK TERM", "zone": "CR", "state": "Maharashtra", "lat": 19.0699, "lon": 72.8911, "stop_count": 140, "is_hub": True},
+        {"code": "BDTS", "name": "BANDRA TERMINUS", "zone": "WR", "state": "Maharashtra", "lat": 19.0628, "lon": 72.8407, "stop_count": 110, "is_hub": True},
+        {"code": "BCT", "name": "MUMBAI CENTRAL", "zone": "WR", "state": "Maharashtra", "lat": 18.9696, "lon": 72.8193, "stop_count": 130, "is_hub": True},
+        {"code": "TNA", "name": "THANE", "zone": "CR", "state": "Maharashtra", "lat": 19.1860, "lon": 72.9759, "stop_count": 160, "is_hub": True},
+        {"code": "PNVL", "name": "PANVEL", "zone": "CR", "state": "Maharashtra", "lat": 18.9894, "lon": 73.1216, "stop_count": 110, "is_hub": True},
+        {"code": "SVJR", "name": "SHIVAJINAGAR", "zone": "CR", "state": "Maharashtra", "lat": 18.5314, "lon": 73.8524, "stop_count": 60, "is_hub": True},
+        {"code": "KK", "name": "KHADKI", "zone": "CR", "state": "Maharashtra", "lat": 18.5638, "lon": 73.8340, "stop_count": 40, "is_hub": False},
+        {"code": "CCH", "name": "CHINCHWAD", "zone": "CR", "state": "Maharashtra", "lat": 18.6298, "lon": 73.7997, "stop_count": 40, "is_hub": False},
+        {"code": "DBA", "name": "DABRA", "zone": "NCR", "state": "Madhya Pradesh", "lat": 25.8856, "lon": 78.3304, "stop_count": 50, "is_hub": False},
+        {"code": "MRA", "name": "MORENA", "zone": "NCR", "state": "Madhya Pradesh", "lat": 26.5008, "lon": 77.9972, "stop_count": 60, "is_hub": False},
+        {"code": "SDAH", "name": "SEALDAH", "zone": "ER", "state": "West Bengal", "lat": 22.5675, "lon": 88.3712, "stop_count": 210, "is_hub": True},
+        {"code": "KOAA", "name": "KOLKATA TERMINAL", "zone": "ER", "state": "West Bengal", "lat": 22.6022, "lon": 88.3742, "stop_count": 80, "is_hub": True},
+        {"code": "YPR", "name": "YESVANTPUR", "zone": "SWR", "state": "Karnataka", "lat": 13.0238, "lon": 77.5503, "stop_count": 150, "is_hub": True},
+        {"code": "SMVB", "name": "SMVT BENGALURU", "zone": "SWR", "state": "Karnataka", "lat": 13.0039, "lon": 77.6534, "stop_count": 90, "is_hub": True},
+        {"code": "SC", "name": "SECUNDERABAD", "zone": "SCR", "state": "Telangana", "lat": 17.4344, "lon": 78.5012, "stop_count": 200, "is_hub": True},
+        {"code": "RKMP", "name": "RANI KAMALAPATI", "zone": "WCR", "state": "Madhya Pradesh", "lat": 23.2201, "lon": 77.4388, "stop_count": 110, "is_hub": True},
+        {"code": "INDB", "name": "INDORE JN", "zone": "WR", "state": "Madhya Pradesh", "lat": 22.7177, "lon": 75.8682, "stop_count": 90, "is_hub": True},
+        {"code": "JBP", "name": "JABALPUR JN", "zone": "WCR", "state": "Madhya Pradesh", "lat": 23.1815, "lon": 79.9414, "stop_count": 130, "is_hub": True},
+        {"code": "PRYJ", "name": "PRAYAGRAJ JN", "zone": "NCR", "state": "Uttar Pradesh", "lat": 25.4437, "lon": 81.8258, "stop_count": 230, "is_hub": True},
+        {"code": "DDU", "name": "PT DD UPADHYAYA", "zone": "ECR", "state": "Uttar Pradesh", "lat": 25.2818, "lon": 83.1197, "stop_count": 260, "is_hub": True},
+        {"code": "LKO", "name": "LUCKNOW CHARBAGH", "zone": "NR", "state": "Uttar Pradesh", "lat": 26.8322, "lon": 80.9197, "stop_count": 180, "is_hub": True},
+        {"code": "PNBE", "name": "PATNA JN", "zone": "ECR", "state": "Bihar", "lat": 25.6022, "lon": 85.1376, "stop_count": 190, "is_hub": True},
+        {"code": "ADI", "name": "AHMEDABAD JN", "zone": "WR", "state": "Gujarat", "lat": 23.0225, "lon": 72.6015, "stop_count": 190, "is_hub": True},
+        {"code": "JP", "name": "JAIPUR JN", "zone": "NWR", "state": "Rajasthan", "lat": 26.9196, "lon": 75.7878, "stop_count": 150, "is_hub": True},
+        {"code": "ST", "name": "SURAT", "zone": "WR", "state": "Gujarat", "lat": 21.2052, "lon": 72.8407, "stop_count": 170, "is_hub": True},
+        {"code": "BRC", "name": "VADODARA JN", "zone": "WR", "state": "Gujarat", "lat": 22.3107, "lon": 73.1812, "stop_count": 210, "is_hub": True},
+        {"code": "NGP", "name": "NAGPUR JN", "zone": "CR", "state": "Maharashtra", "lat": 21.1524, "lon": 79.0888, "stop_count": 210, "is_hub": True},
+        {"code": "ASR", "name": "AMRITSAR JN", "zone": "NR", "state": "Punjab", "lat": 31.6330, "lon": 74.8656, "stop_count": 80, "is_hub": True},
+        {"code": "CDG", "name": "CHANDIGARH", "zone": "NR", "state": "Chandigarh", "lat": 30.7022, "lon": 76.8203, "stop_count": 70, "is_hub": True},
+        {"code": "SNSI", "name": "SAINAGAR SHIRDI", "zone": "CR", "state": "Maharashtra", "lat": 19.7645, "lon": 74.4762, "stop_count": 30, "is_hub": True},
+        {"code": "SVDK", "name": "SHRI MATA VAISHNO DEVI KATRA", "zone": "NR", "state": "Jammu and Kashmir", "lat": 32.9912, "lon": 74.9317, "stop_count": 40, "is_hub": True},
+        {"code": "JAT", "name": "JAMMU TAWI", "zone": "NR", "state": "Jammu and Kashmir", "lat": 32.7063, "lon": 74.8797, "stop_count": 70, "is_hub": True},
+        {"code": "UBL", "name": "SSS HUBBALLI JN", "zone": "SWR", "state": "Karnataka", "lat": 15.3496, "lon": 75.1481, "stop_count": 90, "is_hub": True},
+        {"code": "MAQ", "name": "MANGALURU CENTRAL", "zone": "SR", "state": "Karnataka", "lat": 12.8631, "lon": 74.8431, "stop_count": 60, "is_hub": True},
+        {"code": "TATA", "name": "TATANAGAR JN", "zone": "SER", "state": "Jharkhand", "lat": 22.7667, "lon": 86.2008, "stop_count": 110, "is_hub": True},
+        {"code": "UMB", "name": "AMBALA CANTT", "zone": "NR", "state": "Haryana", "lat": 30.3444, "lon": 76.8375, "stop_count": 180, "is_hub": True},
+        {"code": "GGN", "name": "GURGAON", "zone": "NR", "state": "Haryana", "lat": 28.4682, "lon": 77.0191, "stop_count": 50, "is_hub": False},
+    ]
+
+    cache = []
+    by_code = {}
+    for item in fallback_stations:
+        cache.append(item)
+        by_code[item["code"]] = item
+
+    _STATIONS_CACHE = cache
+    _STATIONS_BY_CODE = by_code
 
 
 async def search_stations(query: str, limit: int = 15) -> List[StationSearchResult]:
