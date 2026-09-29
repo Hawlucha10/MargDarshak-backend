@@ -10,6 +10,9 @@ jobs:
   test:
     name: Run Automated Test Suite & Linter
     runs-on: ubuntu-latest
+    env:
+      TESTING: "1"
+      RAILWAY_PROVIDER: "CRIS_SIMULATOR"
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -27,11 +30,11 @@ jobs:
 
       - name: Run Ruff Code Quality Lint
         run: |
-          ruff check . --ignore E501,F401,F841 || true
+          ruff check app/ tests/ --ignore E501,F401,F841
 
-      - name: Execute Pytest Suite (24 Tests)
+      - name: Execute Pytest Suite (40 Tests)
         run: |
-          pytest -v
+          pytest -v tests/
 
   docker-build:
     name: Build & Verify Production Container

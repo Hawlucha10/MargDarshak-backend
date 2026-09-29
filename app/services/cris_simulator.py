@@ -9,10 +9,12 @@ Replicates the core operational services of Indian Railways with zero external A
 
 import asyncio
 from datetime import datetime, timezone, timedelta
+import json
 import math
 import random
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
+
 
 from sqlalchemy import text
 

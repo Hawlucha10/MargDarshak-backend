@@ -1,5 +1,7 @@
 """PostgreSQL + PostGIS database connection pool and session manager."""
 
+import os
+import sys
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 from sqlalchemy.ext.asyncio import (
@@ -9,6 +11,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 from sqlalchemy.orm import declarative_base
+from sqlalchemy.pool import NullPool
 from app.config import get_settings
 
 Base = declarative_base()
@@ -21,13 +24,21 @@ def get_engine() -> AsyncEngine:
     global _engine
     if _engine is None:
         settings = get_settings()
-        _engine = create_async_engine(
-            settings.postgres_url,
-            echo=False,
-            pool_size=20,
-            max_overflow=10,
-            pool_pre_ping=True,
-        )
+        is_testing = os.getenv("TESTING") == "1" or "pytest" in sys.modules
+        if is_testing:
+            _engine = create_async_engine(
+                settings.postgres_url,
+                echo=False,
+                poolclass=NullPool,
+            )
+        else:
+            _engine = create_async_engine(
+                settings.postgres_url,
+                echo=False,
+                pool_size=20,
+                max_overflow=10,
+                pool_pre_ping=True,
+            )
     return _engine
 
 

@@ -287,7 +287,7 @@ async def _direct_railkit_train_availability(
     # 4. If no live data from API: Do NOT generate fake/simulated fallback!
     # Direct user clearly to IRCTC official website.
     if not classes_output:
-        irctc_url = f"https://www.irctc.co.in/nget/train-search"
+        irctc_url = "https://www.irctc.co.in/nget/train-search"
         response = TrainAvailabilityResponse(
             train_number=clean_num,
             train_name=train_name,
