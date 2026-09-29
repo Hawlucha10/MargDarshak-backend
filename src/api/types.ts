@@ -35,6 +35,7 @@ export interface TransferConnection {
 }
 
 export interface JourneyRoute {
+  route_id?: string;
   label: string;
   total_travel_time: string;
   total_fare?: number;
@@ -92,6 +93,59 @@ export interface TrainAvailabilityResponse {
   arbitrage_recommendation?: QuotaArbitrageTip | null;
   cached: boolean;
   checked_at: string;
+  api_status?: 'success' | 'unavailable' | 'error';
+  message?: string | null;
+  irctc_url?: string;
+}
+
+export interface LegAvailabilityRequest {
+  train_number: string;
+  train_name?: string | null;
+  from_station: string;
+  to_station: string;
+  travel_date: string;
+  travel_class?: string;
+  quota?: string;
+}
+
+export interface RouteAvailabilityRequest {
+  route_id: string;
+  legs: LegAvailabilityRequest[];
+}
+
+export interface LegAvailabilityResult {
+  train_number: string;
+  train_name: string;
+  from_station: string;
+  to_station: string;
+  travel_class: string;
+  quota: string;
+  status: string;
+  seats: number;
+  fare_inr: number;
+  confirmation_probability?: number | null;
+  is_confirmed: boolean;
+  quota_arbitrage?: QuotaArbitrageTip | null;
+  classes: ClassAvailabilityInfo[];
+  api_status: string;
+  message?: string | null;
+  irctc_url: string;
+}
+
+export interface RouteAvailabilityResponse {
+  route_id: string;
+  is_fully_confirmed: boolean;
+  overall_confirmation_risk: string;
+  total_fare_inr: number;
+  legs: LegAvailabilityResult[];
+  advisories: string[];
+  advisory_notes?: string[];
+  cached: boolean;
+  api_status: string;
+  message?: string | null;
+  irctc_url: string;
+  joint_confirmation_pct?: string | null;
+  joint_confirmation_prob?: number | null;
 }
 
 export interface TrainStop {

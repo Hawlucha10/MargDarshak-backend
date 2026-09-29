@@ -15,14 +15,18 @@ import type { JourneyRoute } from '../api/types';
 interface RouteTileProps {
   route: JourneyRoute;
   index: number;
-  onCheckAvailability: (trainNum: string, from: string, to: string, route: JourneyRoute) => void;
-  onTrackLive: (trainNum: string) => void;
+  onCheckAvailability: (trainNum: string, from: string, to: string, route?: JourneyRoute, trainName?: string) => void;
+  onCheckRouteAvailability?: (route: JourneyRoute) => void;
+  onCheckLegAvailability?: (trainNum: string, from: string, to: string, trainName?: string) => void;
+  onTrackLive: (trainNum: string, trainName?: string) => void;
 }
 
 export const RouteTile: React.FC<RouteTileProps> = ({
   route,
   index,
   onCheckAvailability,
+  onCheckRouteAvailability,
+  onCheckLegAvailability,
   onTrackLive,
 }) => {
   const [isExpanded, setIsExpanded] = useState(index === 0); // Expand top route by default
@@ -218,7 +222,20 @@ export const RouteTile: React.FC<RouteTileProps> = ({
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            onTrackLive(leg.train_number);
+                            if (onCheckLegAvailability) {
+                              onCheckLegAvailability(leg.train_number, leg.from_station, leg.to_station, leg.train_name);
+                            } else {
+                              onCheckAvailability(leg.train_number, leg.from_station, leg.to_station, route, leg.train_name);
+                            }
+                          }}
+                          className="text-[11px] font-mono font-bold bg-[#EFF6FF] text-[#1D4ED8] hover:bg-[#1D4ED8] hover:text-white px-2.5 py-1 border border-[#BFDBFE] transition-colors flex items-center space-x-1 cursor-pointer"
+                        >
+                          <span>Check Leg Seats</span>
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onTrackLive(leg.train_number, leg.train_name);
                           }}
                           className="text-[11px] font-mono font-bold bg-[#F1EFE9] hover:bg-[#0F172A] hover:text-white px-2.5 py-1 border border-[#CBD5E1] transition-colors flex items-center space-x-1 cursor-pointer"
                         >
@@ -314,15 +331,27 @@ export const RouteTile: React.FC<RouteTileProps> = ({
           {/* ACTION BUTTONS BAR */}
           <div className="mt-5 pt-4 border-t border-[#CBD5E1] flex flex-wrap items-center justify-between gap-3">
             <button
-              onClick={() => onCheckAvailability(firstLeg.train_number, firstLeg.from_station, lastLeg.to_station, route)}
+              onClick={() => {
+                if (route.transfers === 0 || !onCheckRouteAvailability) {
+                  onCheckAvailability(firstLeg.train_number, firstLeg.from_station, lastLeg.to_station, route, firstLeg.train_name);
+                } else {
+                  onCheckRouteAvailability(route);
+                }
+              }}
               className="bg-[#1D4ED8] hover:bg-[#1E40AF] text-white border border-[#0F172A] px-5 py-2.5 font-mono text-xs font-bold uppercase tracking-wider flex items-center space-x-2 shadow-[3px_3px_0px_0px_#0F172A] active:translate-x-0.5 active:translate-y-0.5 transition-all cursor-pointer"
             >
-              <span>CHECK REAL-TIME SEAT AVAILABILITY (SL, 3A, 3E)</span>
+              <span>
+                {route.transfers === 0
+                  ? 'CHECK DIRECT SEAT AVAILABILITY (SL, 3A, 3E)'
+                  : `CHECK JOURNEY SEATS (${route.legs.length} LEGS)`}
+              </span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
 
             <span className="text-xs font-mono text-[#64748B]">
-              Sub-second Tier-2 IRCTC Quota Check with Bayesian Confirmation Odds
+              {route.transfers === 0
+                ? 'Sub-second Tier-2 IRCTC Quota Check'
+                : 'Concurrent Leg-by-Leg Multi-Hop IRCTC Verification'}
             </span>
           </div>
         </div>

@@ -1,50 +1,24 @@
-import React from 'react';
-import { Activity } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
-interface NavbarProps {
-  onReset?: () => void;
-}
-
-export const Navbar: React.FC<NavbarProps> = ({ onReset }) => {
+export default function Navbar() {
   return (
-    <header className="border-b border-[#E2DFD7] bg-[#F7F5F0] sticky top-0 z-40">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-        {/* Brand Logo & Architectural Title */}
-        <div 
-          onClick={onReset}
-          className="flex items-center space-x-3 cursor-pointer group"
-        >
-          <div className="w-9 h-9 bg-[#0F172A] flex items-center justify-center text-white font-mono font-bold text-sm tracking-wider group-hover:bg-[#1D4ED8] transition-colors">
-            MD
-          </div>
-          <div>
-            <div className="flex items-center space-x-2">
-              <span className="font-mono text-xs uppercase tracking-widest text-[#64748B] font-semibold">
-                PS: T02 // Binary Beacons
-              </span>
-            </div>
-            <h1 className="text-base font-extrabold tracking-tight text-[#0F172A] uppercase flex items-center gap-1.5">
-              MargDarshak
-              <span className="text-[11px] font-mono font-medium px-1.5 py-0.5 bg-[#E2DFD7] text-[#475569] rounded-none">
-                v0.4.0
-              </span>
-            </h1>
-          </div>
+    <nav className="p-6 absolute top-0 left-0 z-50">
+      <Link
+        to="/"
+        className="group inline-flex items-center gap-3 bg-white/95 backdrop-blur-md px-5 py-2.5 rounded-2xl shadow-[0_4px_20px_rgba(26,39,102,0.08)] border border-stone-200/80 transition-all hover:shadow-[0_6px_24px_rgba(26,39,102,0.12)] hover:-translate-y-0.5"
+      >
+        <span className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#1A2766] to-[#3B5BDB] flex items-center justify-center text-[#F5F0E8] font-serif font-bold text-xl shadow-xs group-hover:scale-105 transition-transform">
+          M
+        </span>
+        <div className="flex flex-col">
+          <span
+            className="text-[#1A2766] text-2xl font-bold tracking-tight leading-none group-hover:text-brand-blue transition-colors"
+            style={{ fontFamily: "'DM Serif Display', Georgia, serif" }}
+          >
+            MargDarshak
+          </span>
         </div>
-
-        {/* Technical Status Badges */}
-        <div className="flex items-center space-x-4">
-          <div className="hidden sm:flex items-center space-x-2 text-xs font-mono text-[#475569] border border-[#E2DFD7] bg-white px-3 py-1.5">
-            <span className="w-2 h-2 rounded-full bg-[#15803D] animate-pulse"></span>
-            <span>POSTGIS + REDIS // RAPTOR ONLINE</span>
-          </div>
-
-          <div className="flex items-center space-x-2 text-xs font-mono border border-[#0F172A] px-3 py-1.5 bg-[#0F172A] text-white">
-            <Activity className="w-3.5 h-3.5 text-[#38BDF8]" />
-            <span>P85 GUARANTEE</span>
-          </div>
-        </div>
-      </div>
-    </header>
+      </Link>
+    </nav>
   );
-};
+}

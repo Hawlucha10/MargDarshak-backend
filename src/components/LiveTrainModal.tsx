@@ -7,6 +7,8 @@ interface LiveTrainModalProps {
   onClose: () => void;
   data: TrainLiveStatus | null;
   isLoading: boolean;
+  trainNumber?: string;
+  trainName?: string;
 }
 
 export const LiveTrainModal: React.FC<LiveTrainModalProps> = ({
@@ -14,8 +16,13 @@ export const LiveTrainModal: React.FC<LiveTrainModalProps> = ({
   onClose,
   data,
   isLoading,
+  trainNumber,
+  trainName,
 }) => {
   if (!isOpen) return null;
+
+  const displayTrainNum = data?.train_number || trainNumber || '';
+  const displayTrainName = data?.train_name || trainName || '';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
@@ -28,12 +35,13 @@ export const LiveTrainModal: React.FC<LiveTrainModalProps> = ({
             </span>
             <h3 className="text-xl font-black text-[#0F172A] uppercase tracking-tight flex items-center gap-2">
               <Train className="w-5 h-5 text-[#1D4ED8]" />
-              <span>Live Running Status</span>
+              <span>Live Running Status {displayTrainNum ? `// ${displayTrainNum} ${displayTrainName}`.trim() : ''}</span>
             </h3>
           </div>
           <button
             onClick={onClose}
             className="w-8 h-8 border border-[#0F172A] bg-white hover:bg-[#0F172A] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+            aria-label="Close"
           >
             <X className="w-4 h-4" />
           </button>
@@ -43,7 +51,7 @@ export const LiveTrainModal: React.FC<LiveTrainModalProps> = ({
           <div className="py-12 flex flex-col items-center justify-center space-y-3">
             <div className="w-8 h-8 border-4 border-[#1D4ED8] border-t-transparent rounded-full animate-spin"></div>
             <p className="font-mono text-xs uppercase font-bold text-[#64748B]">
-              Synchronizing Live Train Telemetry & GPS Tracking...
+              Synchronizing Live Train Telemetry & GPS Tracking for {displayTrainNum || 'Train'}...
             </p>
           </div>
         ) : data ? (
@@ -86,6 +94,18 @@ export const LiveTrainModal: React.FC<LiveTrainModalProps> = ({
                   style={{ width: `${data.journey_percent}%` }}
                 ></div>
               </div>
+
+              {/* Status Line */}
+              {data.updated_at && (
+                <div className="mt-3 text-[11px] font-mono border-t border-[#334155] pt-2.5 flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-[#E2E8F0]">
+                    TELEMETRY: <strong className={data.delay_minutes === 0 ? "text-[#4ADE80]" : "text-[#FCD34D]"}>{data.updated_at}</strong>
+                  </span>
+                  <span className="text-[#94A3B8] text-[10px]">
+                    PROVIDER: <strong className="text-[#38BDF8] uppercase">{data.source || 'CRIS COA / RTIS'}</strong>
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* STATION TIMELINE */}
@@ -137,8 +157,16 @@ export const LiveTrainModal: React.FC<LiveTrainModalProps> = ({
             </div>
           </div>
         ) : (
-          <div className="py-8 text-center font-mono text-xs text-[#64748B]">
-            No live telemetry received.
+          <div className="py-8 text-center font-mono text-xs text-[#64748B] space-y-2">
+            <div>No live telemetry received for Train {displayTrainNum || ''}.</div>
+            <a
+              href="https://www.irctc.co.in/nget/train-search"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center space-x-1 text-[#1D4ED8] font-bold hover:underline"
+            >
+              <span>Check on Official IRCTC Portal</span>
+            </a>
           </div>
         )}
 

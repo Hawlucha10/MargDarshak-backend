@@ -1,11 +1,13 @@
 import type {
+  RouteAvailabilityRequest,
+  RouteAvailabilityResponse,
   RouteSearchResponse,
   StationItem,
   TrainAvailabilityResponse,
   TrainLiveStatus,
 } from './types';
 
-const API_BASE = 'http://localhost:8000/api/v1';
+const API_BASE = '/api/v1';
 
 // Popular Indian City -> Nearby Railway Stations Mapping (for cities with/without direct railway stations)
 export const CITY_NEARBY_HUBS: Record<string, StationItem[]> = {
@@ -67,6 +69,8 @@ export async function getPopularStations(): Promise<StationItem[]> {
     { code: 'PUNE', name: 'PUNE JN', zone: 'CR', state: 'Maharashtra', is_hub: true },
     { code: 'CSTM', name: 'MUMBAI CST', zone: 'CR', state: 'Maharashtra', is_hub: true },
     { code: 'BPL', name: 'BHOPAL JN', zone: 'WCR', state: 'Madhya Pradesh', is_hub: true },
+    { code: 'INDB', name: 'INDORE JN BG', zone: 'WR', state: 'Madhya Pradesh', is_hub: true },
+    { code: 'JBP', name: 'JABALPUR', zone: 'WCR', state: 'Madhya Pradesh', is_hub: true },
     { code: 'HWH', name: 'HOWRAH JN', zone: 'ER', state: 'West Bengal', is_hub: true },
     { code: 'SBC', name: 'KSR BENGALURU', zone: 'SWR', state: 'Karnataka', is_hub: true },
     { code: 'MAS', name: 'MGR CHENNAI CTL', zone: 'SR', state: 'Tamil Nadu', is_hub: true },
@@ -103,6 +107,8 @@ export async function searchStations(query: string): Promise<StationItem[]> {
     { code: 'PUNE', name: 'PUNE JN', zone: 'CR', state: 'Maharashtra', is_hub: true },
     { code: 'NDLS', name: 'NEW DELHI', zone: 'NR', state: 'Delhi', is_hub: true },
     { code: 'BPL', name: 'BHOPAL JN', zone: 'WCR', state: 'Madhya Pradesh', is_hub: true },
+    { code: 'INDB', name: 'INDORE JN BG', zone: 'WR', state: 'Madhya Pradesh', is_hub: true },
+    { code: 'JBP', name: 'JABALPUR', zone: 'WCR', state: 'Madhya Pradesh', is_hub: true },
     { code: 'CSTM', name: 'MUMBAI CST', zone: 'CR', state: 'Maharashtra', is_hub: true },
     { code: 'HWH', name: 'HOWRAH JN', zone: 'ER', state: 'West Bengal', is_hub: true },
     { code: 'SBC', name: 'KSR BENGALURU', zone: 'SWR', state: 'Karnataka', is_hub: true },
@@ -156,6 +162,7 @@ export async function checkTrainAvailability(params: {
   toStation: string;
   travelDate: string;
   quota?: string;
+  travelClass?: string;
 }): Promise<TrainAvailabilityResponse> {
   const payload = {
     train_number: params.trainNumber,
@@ -163,6 +170,7 @@ export async function checkTrainAvailability(params: {
     to_station: params.toStation,
     travel_date: params.travelDate,
     quota: params.quota ?? 'GN',
+    travel_class: params.travelClass ?? 'SL',
   };
 
   const res = await fetch(`${API_BASE}/availability/train`, {
@@ -184,3 +192,19 @@ export async function getLiveTrainStatus(trainNumber: string): Promise<TrainLive
   }
   return res.json();
 }
+
+export async function checkRouteAvailability(
+  payload: RouteAvailabilityRequest
+): Promise<RouteAvailabilityResponse> {
+  const res = await fetch(`${API_BASE}/availability/route`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Route availability check failed with status ${res.status}`);
+  }
+  return res.json();
+}
+

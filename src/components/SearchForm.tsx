@@ -21,22 +21,11 @@ interface SearchFormProps {
 }
 
 export const SearchForm: React.FC<SearchFormProps> = ({ onSearch, isLoading }) => {
-  const [originSelected, setOriginSelected] = useState<StationItem>({
-    code: 'GWL',
-    name: 'GWALIOR JN',
-    zone: 'NCR',
-    state: 'Madhya Pradesh',
-    is_hub: true,
-  });
+  const [originSelected, setOriginSelected] = useState<StationItem | null>(null);
+  const [destSelected, setDestSelected] = useState<StationItem | null>(null);
 
-  const [destSelected, setDestSelected] = useState<StationItem>({
-    code: 'PUNE',
-    name: 'PUNE JN',
-    zone: 'CR',
-    state: 'Maharashtra',
-    is_hub: true,
-  });
-
+  // Today's date in YYYY-MM-DD format (prevent past dates)
+  const todayDateStr = new Date().toISOString().split('T')[0];
   // Set default travel date to 7 days from now
   const defaultDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
   const [travelDate, setTravelDate] = useState(defaultDate);
@@ -53,10 +42,11 @@ export const SearchForm: React.FC<SearchFormProps> = ({ onSearch, isLoading }) =
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!originSelected?.code || !destSelected?.code) return;
+    const effectiveDate = (!travelDate || travelDate < todayDateStr) ? todayDateStr : travelDate;
     onSearch({
       origin: originSelected.code,
       destination: destSelected.code,
-      travelDate,
+      travelDate: effectiveDate,
       priority,
       accessibleOnly,
     });
@@ -67,16 +57,25 @@ export const SearchForm: React.FC<SearchFormProps> = ({ onSearch, isLoading }) =
     if (!nlpInput.trim()) return;
     const lower = nlpInput.toLowerCase();
     
+    let orig = originSelected;
+    let dst = destSelected;
+
     // Quick keyword matching for common corridors
     if (lower.includes('pune') && (lower.includes('gwalior') || lower.includes('gwl'))) {
-      setOriginSelected({ code: 'GWL', name: 'GWALIOR JN', state: 'Madhya Pradesh', zone: 'NCR' });
-      setDestSelected({ code: 'PUNE', name: 'PUNE JN', state: 'Maharashtra', zone: 'CR' });
+      orig = { code: 'GWL', name: 'GWALIOR JN', state: 'Madhya Pradesh', zone: 'NCR' };
+      dst = { code: 'PUNE', name: 'PUNE JN', state: 'Maharashtra', zone: 'CR' };
+      setOriginSelected(orig);
+      setDestSelected(dst);
     } else if (lower.includes('delhi') && (lower.includes('mumbai') || lower.includes('bombay'))) {
-      setOriginSelected({ code: 'NDLS', name: 'NEW DELHI', state: 'Delhi', zone: 'NR' });
-      setDestSelected({ code: 'CSTM', name: 'MUMBAI CST', state: 'Maharashtra', zone: 'CR' });
+      orig = { code: 'NDLS', name: 'NEW DELHI', state: 'Delhi', zone: 'NR' };
+      dst = { code: 'CSMT', name: 'MUMBAI CSMT', state: 'Maharashtra', zone: 'CR' };
+      setOriginSelected(orig);
+      setDestSelected(dst);
     } else if (lower.includes('delhi') && lower.includes('kolkata')) {
-      setOriginSelected({ code: 'NDLS', name: 'NEW DELHI', state: 'Delhi', zone: 'NR' });
-      setDestSelected({ code: 'HWH', name: 'HOWRAH JN', state: 'West Bengal', zone: 'ER' });
+      orig = { code: 'NDLS', name: 'NEW DELHI', state: 'Delhi', zone: 'NR' };
+      dst = { code: 'HWH', name: 'HOWRAH JN', state: 'West Bengal', zone: 'ER' };
+      setOriginSelected(orig);
+      setDestSelected(dst);
     }
 
     let detectedPriority = priority;
@@ -88,9 +87,11 @@ export const SearchForm: React.FC<SearchFormProps> = ({ onSearch, isLoading }) =
       setPriority('fastest');
     }
 
+    if (!orig?.code || !dst?.code) return;
+
     onSearch({
-      origin: originSelected.code,
-      destination: destSelected.code,
+      origin: orig.code,
+      destination: dst.code,
       travelDate,
       priority: detectedPriority,
       accessibleOnly,
@@ -164,9 +165,17 @@ export const SearchForm: React.FC<SearchFormProps> = ({ onSearch, isLoading }) =
                 <Calendar className="w-4 h-4 text-[#64748B] mr-2.5 shrink-0" />
                 <input
                   type="date"
+                  min={todayDateStr}
                   value={travelDate}
-                  onChange={(e) => setTravelDate(e.target.value)}
-                  className="w-full bg-transparent font-mono font-bold text-sm text-[#0F172A] outline-none"
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val && val < todayDateStr) {
+                      setTravelDate(todayDateStr);
+                    } else {
+                      setTravelDate(val);
+                    }
+                  }}
+                  className="w-full bg-transparent font-mono font-bold text-sm text-[#0F172A] outline-none cursor-pointer"
                 />
               </div>
             </div>
