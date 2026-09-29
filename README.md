@@ -56,7 +56,7 @@ app/
 
 1. **Adaptive Geometric Route Deflection (AGRD)**:
    Filters out **94.2% of irrelevant stations in $<1\text{ ms}$** using a focal ellipsoidal spatial filter:
-   $$\mathcal{E} = \left\{ x \in \mathbb{R}^2 \;\middle|\; d(S_{\text{origin}}, x) + d(x, S_{\text{dest}}) \le \lambda \cdot d(S_{\text{origin}}, S_{\text{dest}}) \right\}$$
+   $$\mathcal{E} = \left\lbrace x \in \mathbb{R}^2 \mid d(S_{\text{origin}}, x) + d(x, S_{\text{dest}}) \le \lambda \cdot d(S_{\text{origin}}, S_{\text{dest}}) \right\rbrace$$
 2. **Round-Based Public Transit Routing (RAPTOR)**:
    Runs multi-label Pareto dynamic programming across 4 dimensions: Duration, Cost, P85 Reliability, and Comfort.
 3. **Tri-Model ML Stacking Delay Prediction**:
