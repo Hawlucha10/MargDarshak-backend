@@ -2,7 +2,6 @@
 ### Autonomous Multi-Modal Routing, Spatial Pruning, and Delay Probability Microservice
 
 **Architect & Lead Engineer:** Ojas Nagar (`oriio1309` · oriio.1304@gmail.com)  
-**Pitch / Hackathon:** Team `potato_1` · Smart India Hackathon (SIH 2026)  
 **Repository:** [Hawlucha10/MargDarshak-backend](https://github.com/Hawlucha10/MargDarshak-backend)  
 **CI/CD Pipeline Status:** ![CI/CD Status](https://img.shields.io/badge/CI%2FCD%20Pipeline-Passing%20(40%2F40)-brightgreen) ![Python 3.11](https://img.shields.io/badge/Python-3.11%20%7C%203.12-blue) ![License](https://img.shields.io/badge/License-MIT-purple)
 
