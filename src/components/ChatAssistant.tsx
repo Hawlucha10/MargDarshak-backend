@@ -124,17 +124,17 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({
   };
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 font-sans">
-      {/* Floating Toggle Button */}
+    <div className={`fixed z-50 font-['Timeless'] ${isOpen ? 'bottom-6 right-4 sm:right-6' : 'bottom-[38px] sm:bottom-[42px] right-6 sm:right-10'}`}>
+      {/* Floating Toggle Button - Raised so it cleanly overlaps the footer strip */}
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="group flex items-center gap-3 px-5 py-3.5 bg-[#4A5D30] hover:bg-[#3D4C27] text-white rounded-full shadow-2xl transition-all duration-300 hover:scale-105 active:scale-95 border-2 border-[#E5D5BF]"
+          className="group flex items-center gap-3 px-5 py-3.5 bg-[#4A5D30] hover:bg-[#3D4C27] text-[#F6F0E6] rounded-full shadow-2xl transition-all duration-300 hover:scale-105 active:scale-95 border-2 border-[#E5D5BF]"
           aria-label="Open MargDarshak AI Travel Assistant"
         >
           <div className="relative">
             <svg
-              className="w-6 h-6 text-white"
+              className="w-6 h-6 text-[#F6F0E6]"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -151,13 +151,13 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({
               <span className="relative inline-flex rounded-full h-3 w-3 bg-[#E5D5BF]"></span>
             </span>
           </div>
-          <span className="font-semibold tracking-wide text-sm">MargDarshak AI</span>
+          <span className="font-semibold tracking-wide text-sm font-['Timeless']">MargDarshak AI</span>
         </button>
       )}
 
       {/* Slide-Up Chat Window */}
       {isOpen && (
-        <div className="w-[390px] max-w-[95vw] h-[580px] max-h-[85vh] bg-[#F6F0E6] rounded-2xl shadow-2xl border-2 border-[#4A5D30]/20 flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-5 duration-300">
+        <div className="w-[390px] max-w-[95vw] h-[580px] max-h-[85vh] bg-[#F6F0E6] rounded-2xl shadow-2xl border-2 border-[#4A5D30]/20 flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-5 duration-300 font-['Timeless']">
           {/* Header */}
           <div className="bg-[#4A5D30] text-white px-4 py-3 flex items-center justify-between shadow-md">
             <div className="flex items-center gap-2.5">
@@ -298,18 +298,21 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({
                   </div>
                 )}
 
-                {/* Suggested Action Chips */}
+                {/* Suggested Action Chips (lightbulbs removed, Timeless font applied) */}
                 {m.suggestedActions && m.suggestedActions.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-1.5">
-                    {m.suggestedActions.map((action, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => handleSend(action)}
-                        className="text-[11px] bg-[#E5D5BF]/80 hover:bg-[#E5D5BF] text-gray-900 px-2.5 py-1 rounded-full border border-[#4A5D30]/20 transition-all hover:scale-102 active:scale-98 text-left"
-                      >
-                        💡 {action}
-                      </button>
-                    ))}
+                    {m.suggestedActions.map((action, idx) => {
+                      const cleanAction = action.replace(/^💡\s*/, '');
+                      return (
+                        <button
+                          key={idx}
+                          onClick={() => handleSend(cleanAction)}
+                          className="text-[12px] bg-[#E5D5BF]/85 hover:bg-[#E5D5BF] text-gray-900 px-3 py-1.5 rounded-full border border-[#4A5D30]/25 transition-all hover:scale-102 active:scale-98 text-left font-['Timeless'] font-medium shadow-2xs cursor-pointer"
+                        >
+                          {cleanAction}
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
               </div>

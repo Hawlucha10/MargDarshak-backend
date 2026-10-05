@@ -47,6 +47,10 @@ export interface JourneyRoute {
   fare_arbitrage_tip?: string | null;
   accessibility_badge?: string | null;
   weather_advisory?: string | null;
+  bus_legs?: any[];
+  is_multimodal?: boolean;
+  time_saved_vs_train_minutes?: number | null;
+  comfort_score?: number | null;
 }
 
 export interface RouteSearchResponse {

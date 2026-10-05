@@ -6,7 +6,6 @@ import {
   ChevronUp, 
   ArrowRight, 
   Train, 
-  Bus,
   AlertTriangle, 
   ArrowDownUp,
   Tag
@@ -33,13 +32,12 @@ export const RouteTile: React.FC<RouteTileProps> = ({
   const [isExpanded, setIsExpanded] = useState(index === 0); // Expand top route by default
 
   const hasTrains = Boolean(route.legs && route.legs.length > 0);
-  const hasBuses = Boolean(route.bus_legs && route.bus_legs.length > 0);
 
   const firstLeg = hasTrains ? route.legs[0] : null;
   const lastLeg = hasTrains ? route.legs[route.legs.length - 1] : null;
 
-  const firstBus = hasBuses ? route.bus_legs[0] : null;
-  const lastBus = hasBuses ? route.bus_legs[route.bus_legs.length - 1] : null;
+  const firstBus = (route.bus_legs && route.bus_legs.length > 0) ? route.bus_legs[0] : null;
+  const lastBus = (route.bus_legs && route.bus_legs.length > 0) ? route.bus_legs[route.bus_legs.length - 1] : null;
 
   // Origin info: prefer train if train leg exists first, else bus
   const depTime = (firstLeg?.departure_time || firstBus?.departure_time || '08:00').slice(0, 5);
@@ -337,7 +335,7 @@ export const RouteTile: React.FC<RouteTileProps> = ({
             })}
 
             {/* BUS LEGS */}
-            {route.bus_legs?.map((bus, bIdx) => (
+            {route.bus_legs?.map((bus: any, bIdx: number) => (
               <div key={bus.operator_code + bIdx} className="space-y-3">
                 <div className="border border-[#F59E0B] bg-[#FFFBEB] p-4">
                   <div className="flex flex-wrap items-center justify-between pb-3 border-b border-[#FEF3C7] gap-2">

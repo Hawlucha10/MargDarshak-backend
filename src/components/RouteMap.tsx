@@ -204,7 +204,7 @@ export default function RouteMap({ legs = [], busLegs = [] }: Props) {
             fillOpacity={1}
             weight={3}
           >
-            <Tooltip permanent direction="top" offset={[0, -10]} className="!bg-white !border-0 !shadow-md !rounded-full !px-3 !py-1 !font-sans !text-xs !font-semibold !text-slate-800">
+            <Tooltip permanent direction="top" offset={[0, -10]} className="!bg-white !border-0 !shadow-md !rounded-full !px-3 !py-1 !font-['Timeless'] !text-xs !font-semibold !text-slate-800">
               {originPt.name} ({originPt.code})
             </Tooltip>
           </CircleMarker>
@@ -220,7 +220,7 @@ export default function RouteMap({ legs = [], busLegs = [] }: Props) {
             fillOpacity={1}
             weight={3}
           >
-            <Tooltip permanent direction="top" offset={[0, -10]} className="!bg-white !border-0 !shadow-md !rounded-full !px-3 !py-1 !font-sans !text-xs !font-semibold !text-slate-800">
+            <Tooltip permanent direction="top" offset={[0, -10]} className="!bg-white !border-0 !shadow-md !rounded-full !px-3 !py-1 !font-['Timeless'] !text-xs !font-semibold !text-slate-800">
               {destPt.name} ({destPt.code})
             </Tooltip>
           </CircleMarker>
@@ -241,7 +241,7 @@ export default function RouteMap({ legs = [], busLegs = [] }: Props) {
               weight={2.5}
             >
               {isRevealed && (
-                <Tooltip direction="top" offset={[0, -8]} className="!bg-white !border-0 !shadow-md !rounded-lg !px-2.5 !py-1 !font-sans !text-xs !text-slate-700">
+                <Tooltip direction="top" offset={[0, -8]} className="!bg-white !border-0 !shadow-md !rounded-lg !px-2.5 !py-1 !font-['Timeless'] !text-xs !text-slate-700">
                   {s.name} ({s.code})
                 </Tooltip>
               )}
@@ -250,8 +250,8 @@ export default function RouteMap({ legs = [], busLegs = [] }: Props) {
         })}
       </MapContainer>
 
-      {/* Floating Info Box at Bottom-Left of Map (rounded-xl, no capsules) */}
-      <div className="absolute bottom-4 left-4 z-[400] bg-white/95 backdrop-blur-md px-4 py-2.5 rounded-xl shadow-md border border-stone-200/90 text-xs font-sans text-slate-700 flex items-center gap-3">
+      {/* Floating Info Box at Bottom-Left of Map */}
+      <div className="absolute bottom-4 left-4 z-[400] bg-white/95 backdrop-blur-md px-4 py-2.5 rounded-xl shadow-md border border-stone-200/90 text-xs font-['Timeless'] text-slate-700 flex items-center gap-3">
         <span className="flex items-center gap-1.5">
           <span className="w-2.5 h-2.5 rounded-full bg-[#5A6B3C]" /> Origin
         </span>

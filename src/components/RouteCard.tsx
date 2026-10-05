@@ -105,33 +105,33 @@ export default function RouteCard({ route, index, isActive, onSelect }: RoutePro
   return (
     <div
       onClick={onSelect}
-      className={`bg-brand-white rounded-[22px] p-6 shadow-[var(--shadow-soft)] transition-all cursor-pointer border-2 ${
+      className={`bg-brand-white rounded-[22px] p-6 shadow-[var(--shadow-soft)] transition-all cursor-pointer border-2 font-['Timeless'] ${
         isActive
-          ? 'border-brand-blue -translate-y-1 shadow-md'
+          ? 'border-[#4A5D30] -translate-y-1 shadow-md'
           : 'border-white/80 hover:-translate-y-0.5 hover:shadow-md'
       }`}
     >
       {/* Top Bar: Editorial Index Number + Train Name + Fare & Pareto Label */}
-      <div className="flex justify-between items-start mb-4">
+      <div className="flex justify-between items-start mb-4 font-['Timeless']">
         <div className="flex items-start gap-3.5">
-          <span className="font-serif text-3xl font-normal text-brand-text-muted/40 select-none">
+          <span className="font-['Timeless'] text-3xl font-normal text-stone-400/60 select-none">
             {formattedIndex}
           </span>
           <div>
-            <h3 className="font-serif text-2xl text-brand-text font-semibold leading-tight">
+            <h3 className="font-['Timeless'] text-2xl text-[#111111] font-semibold leading-tight">
               {route.trainName}
             </h3>
-            <p className="text-brand-text-muted font-ui text-xs tracking-wide uppercase mt-0.5">
+            <p className="text-stone-500 font-['Timeless'] text-xs tracking-wide uppercase mt-0.5">
               {route.trainNumber}
             </p>
           </div>
         </div>
 
-        <div className="text-right flex-shrink-0">
-          <p className="font-serif text-2xl text-brand-text font-bold">{route.fare}</p>
+        <div className="text-right flex-shrink-0 font-['Timeless']">
+          <p className="font-['Timeless'] text-2xl text-[#111111] font-bold">{route.fare}</p>
           {route.label && (
             <span
-              className={`inline-block text-[11px] px-2.5 py-0.5 rounded-md mt-1 font-ui font-semibold border ${
+              className={`inline-block text-[11px] px-2.5 py-0.5 rounded-md mt-1 font-['Timeless'] font-semibold border ${
                 LABEL_STYLES[route.label] || LABEL_STYLES.ALTERNATIVE
               }`}
             >
@@ -142,41 +142,41 @@ export default function RouteCard({ route, index, isActive, onSelect }: RoutePro
       </div>
 
       {/* Timeline: Departure → Duration → Arrival */}
-      <div className="flex items-center justify-between font-ui text-sm mb-4 bg-brand-cream/40 px-4 py-3 rounded-xl border border-stone-100">
-        <div className="text-left">
-          <p className="font-bold text-brand-text text-base">{route.departure}</p>
-          <span className="text-[11px] text-brand-text-muted">Departure</span>
+      <div className="flex items-center justify-between font-['Timeless'] text-sm mb-4 bg-[#FAF7F2] px-4 py-3 rounded-xl border border-stone-200/60">
+        <div className="text-left font-['Timeless']">
+          <p className="font-bold text-[#111111] text-base font-['Timeless']">{route.departure}</p>
+          <span className="text-[11px] text-stone-500 font-['Timeless']">Departure</span>
         </div>
-        <div className="flex-1 px-4 flex flex-col items-center">
-          <span className="text-brand-text-blue font-ui text-xs font-semibold mb-1">
+        <div className="flex-1 px-4 flex flex-col items-center font-['Timeless']">
+          <span className="text-[#4A5D30] font-['Timeless'] text-xs font-semibold mb-1">
             {route.duration}
           </span>
           <div className="w-full flex items-center">
             <div className="w-2.5 h-2.5 rounded-xs bg-[#5A6B3C]" />
-            <div className="h-0.5 bg-brand-text-muted/30 flex-1 mx-1" />
-            <div className="w-2.5 h-2.5 rounded-xs bg-brand-blue" />
+            <div className="h-0.5 bg-stone-300 flex-1 mx-1" />
+            <div className="w-2.5 h-2.5 rounded-xs bg-[#4A5D30]" />
           </div>
         </div>
-        <div className="text-right">
-          <p className="font-bold text-brand-text text-base">{route.arrival}</p>
-          <span className="text-[11px] text-brand-text-muted">Arrival</span>
+        <div className="text-right font-['Timeless']">
+          <p className="font-bold text-[#111111] text-base font-['Timeless']">{route.arrival}</p>
+          <span className="text-[11px] text-stone-500 font-['Timeless']">Arrival</span>
         </div>
       </div>
 
       {/* Badges & Transfer Meta */}
-      <div className="flex items-center justify-between gap-2 flex-wrap pt-1">
-        <div className="flex items-center gap-2 flex-wrap">
+      <div className="flex items-center justify-between gap-2 flex-wrap pt-1 font-['Timeless']">
+        <div className="flex items-center gap-2 flex-wrap font-['Timeless']">
           {route.hasBusLeg && <BusLegBadge />}
           {route.isComfortable && <ComfortBadge />}
           {route.transfers !== undefined && (
-            <span className="text-xs font-ui bg-stone-100 text-stone-700 px-2.5 py-1 rounded-md border border-stone-200/60 font-medium">
+            <span className="text-xs font-['Timeless'] bg-stone-100 text-stone-700 px-2.5 py-1 rounded-md border border-stone-200/60 font-medium">
               {route.transfers === 0
                 ? (route.hasBusLeg && (!route.legs || route.legs.length === 0) ? 'Direct Highway Bus' : 'Direct Train')
                 : `${route.transfers} ${route.hasBusLeg ? 'Intermodal Transfer' : 'Transfer'}${route.transfers > 1 ? 's' : ''}`}
             </span>
           )}
           {route.reliability && (
-            <span className="text-xs font-ui text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200/70 font-semibold">
+            <span className="text-xs font-['Timeless'] text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200/70 font-semibold">
               Reliability: {route.reliability}
             </span>
           )}
@@ -185,7 +185,7 @@ export default function RouteCard({ route, index, isActive, onSelect }: RoutePro
         {/* Expand / Collapse Button */}
         <button
           onClick={toggleExpand}
-          className="text-xs font-ui text-brand-blue font-medium flex items-center gap-1 hover:underline ml-auto py-1 px-2 rounded-md hover:bg-brand-blue/5 transition-colors"
+          className="text-xs font-['Timeless'] text-[#4A5D30] font-medium flex items-center gap-1 hover:underline ml-auto py-1 px-2 rounded-md hover:bg-[#4A5D30]/10 transition-colors cursor-pointer"
         >
           {isExpanded ? 'Hide Details' : 'View Details'}
           <svg
@@ -202,17 +202,17 @@ export default function RouteCard({ route, index, isActive, onSelect }: RoutePro
 
       {/* Expanded Details Section */}
       {isExpanded && (
-        <div className="mt-5 pt-5 border-t border-stone-100 flex flex-col gap-4 text-xs font-ui animate-fadeIn">
+        <div className="mt-5 pt-5 border-t border-stone-100 flex flex-col gap-4 text-xs font-['Timeless'] animate-fadeIn">
           {/* Detailed Train Legs */}
           {route.legs && route.legs.length > 0 && (
-            <div className="flex flex-col gap-3">
-              <h4 className="font-serif text-sm font-bold text-brand-text tracking-wide uppercase text-stone-500">
+            <div className="flex flex-col gap-3 font-['Timeless']">
+              <h4 className="font-['Timeless'] text-sm font-bold tracking-wide uppercase text-stone-500">
                 Train Journey Sequence
               </h4>
               {route.legs.map((leg, lIdx) => (
-                <div key={lIdx} className="bg-stone-50/80 p-3.5 rounded-xl border border-stone-200/70">
-                  <div className="flex justify-between items-start font-semibold text-brand-text mb-1.5">
-                    <span className="text-brand-blue">
+                <div key={lIdx} className="bg-stone-50/80 p-3.5 rounded-xl border border-stone-200/70 font-['Timeless']">
+                  <div className="flex justify-between items-start font-semibold text-stone-900 mb-1.5 font-['Timeless']">
+                    <span className="text-[#4A5D30] font-['Timeless']">
                       {leg.train_number} — {leg.train_name}
                     </span>
                     {leg.fare_estimate && <span>Est. ₹{leg.fare_estimate}</span>}
@@ -269,8 +269,8 @@ export default function RouteCard({ route, index, isActive, onSelect }: RoutePro
 
           {/* Multimodal Bus Alternative Legs */}
           {route.bus_legs && route.bus_legs.length > 0 && (
-            <div className="flex flex-col gap-2">
-              <h4 className="font-serif text-sm font-bold text-amber-800 tracking-wide uppercase">
+            <div className="flex flex-col gap-2 font-['Timeless']">
+              <h4 className="font-['Timeless'] text-sm font-bold text-amber-800 tracking-wide uppercase">
                 {route.legs && route.legs.length > 0 ? 'Connecting Bus Segment' : 'Highway Express Bus Journey'}
               </h4>
               {route.bus_legs.map((b, bIdx) => (
