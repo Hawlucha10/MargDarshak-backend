@@ -132,7 +132,10 @@ export default function SearchBar() {
         <div className="inline-flex items-center bg-[#E5D5BF]/75 p-1 rounded-full border border-[#4A5D30]/20 shadow-inner w-full max-w-[340px]">
           <button
             type="button"
-            onClick={() => setIsNlpMode(false)}
+            onClick={() => {
+              setIsNlpMode(false);
+              setErrorMsg('');
+            }}
             className={`flex-1 h-8 px-3 rounded-full text-xs sm:text-sm font-semibold tracking-wide transition-all cursor-pointer inline-flex items-center justify-center leading-none text-center ${
               !isNlpMode
                 ? 'bg-[#4A5D30] text-[#F6F0E6] shadow-sm'
@@ -143,7 +146,10 @@ export default function SearchBar() {
           </button>
           <button
             type="button"
-            onClick={() => setIsNlpMode(true)}
+            onClick={() => {
+              setIsNlpMode(true);
+              setErrorMsg('');
+            }}
             className={`flex-1 h-8 px-3 rounded-full text-xs sm:text-sm font-semibold tracking-wide transition-all cursor-pointer inline-flex items-center justify-center leading-none text-center ${
               isNlpMode
                 ? 'bg-[#4A5D30] text-[#F6F0E6] shadow-sm'
@@ -155,40 +161,26 @@ export default function SearchBar() {
         </div>
       </div>
 
-      {isNlpMode ? (
-        <div className="mb-4 space-y-2">
-          <div className="relative">
-            <input
-              type="text"
-              value={nlpQuery}
-              onChange={(e) => setNlpQuery(e.target.value)}
-              placeholder={`Try: "${DYNAMIC_PLACEHOLDERS[placeholderIdx]}"`}
-              className="w-full bg-[#FAF7F2] border border-[#4A5D30]/25 rounded-xl px-4 py-3 text-[#111111] text-sm sm:text-base outline-none focus:bg-white focus:ring-2 focus:ring-[#4A5D30]/30 focus:border-[#4A5D30] placeholder:text-stone-400 transition-all shadow-2xs"
-            />
-            {nlpQuery && (
-              <button
-                type="button"
-                onClick={() => setNlpQuery('')}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-[#4A5D30] text-sm font-bold p-1 cursor-pointer"
-              >
-                ✕
-              </button>
-            )}
-          </div>
-          <p className="text-xs text-stone-500 px-1">
-            Ask naturally in English or Hinglish with timings, preferences, or intermediate bus wishes.
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-3.5 mb-4">
+      {/* Content Panels: Superposed in CSS Grid so the whole box keeps the exact same size */}
+      <div className="grid grid-cols-1 grid-rows-1 mb-4">
+        {/* Panel 1: Station Search */}
+        <div
+          className={`col-start-1 row-start-1 space-y-3.5 transition-opacity duration-150 ${
+            !isNlpMode
+              ? 'opacity-100 relative z-10'
+              : 'opacity-0 pointer-events-none invisible select-none'
+          }`}
+          aria-hidden={isNlpMode}
+        >
           {/* Origin, Swap, Destination in a SINGLE COMPACT LINE */}
           <div className="flex items-center gap-2 sm:gap-3">
             <div className="flex-1 min-w-0">
-              <label className="block text-xs sm:text-[13px] font-semibold text-stone-700 uppercase tracking-wider mb-1">
+              <label className="block text-xs sm:text-[13px] font-semibold text-stone-700 uppercase tracking-wider mb-1 font-['OFLGoudyStM']">
                 From Station or City
               </label>
               <StationAutocomplete
                 value={originDisplay}
+                disabled={isNlpMode}
                 onChange={(code, name) => {
                   setOriginCode(code);
                   setOriginDisplay(`${name} (${code})`);
@@ -201,8 +193,9 @@ export default function SearchBar() {
             <div className="pt-5 shrink-0">
               <button
                 type="button"
+                disabled={isNlpMode}
                 onClick={handleSwap}
-                className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl border border-[#4A5D30]/25 bg-[#FAF7F2] hover:bg-[#E5D5BF] text-[#4A5D30] flex items-center justify-center transition-all shadow-2xs hover:border-[#4A5D30] active:scale-95 cursor-pointer"
+                className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl border border-[#4A5D30]/25 bg-[#FAF7F2] hover:bg-[#E5D5BF] text-[#4A5D30] flex items-center justify-center transition-all shadow-2xs hover:border-[#4A5D30] active:scale-95 cursor-pointer disabled:opacity-50"
                 title="Swap stations"
               >
                 <svg className="w-4 h-4 text-[#4A5D30]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -212,11 +205,12 @@ export default function SearchBar() {
             </div>
 
             <div className="flex-1 min-w-0">
-              <label className="block text-xs sm:text-[13px] font-semibold text-stone-700 uppercase tracking-wider mb-1">
+              <label className="block text-xs sm:text-[13px] font-semibold text-stone-700 uppercase tracking-wider mb-1 font-['OFLGoudyStM']">
                 To Station or City
               </label>
               <StationAutocomplete
                 value={destDisplay}
+                disabled={isNlpMode}
                 onChange={(code, name) => {
                   setDestCode(code);
                   setDestDisplay(`${name} (${code})`);
@@ -237,6 +231,7 @@ export default function SearchBar() {
                   value={date}
                   onChange={setDate}
                   minDate={todayStr}
+                  disabled={isNlpMode}
                 />
                 {date && (
                   <span className="hidden sm:inline-flex h-8.5 items-center justify-center px-3 rounded-full text-[13px] sm:text-sm font-semibold text-[#4A5D30] bg-[#E5D5BF]/60 border border-[#4A5D30]/20 font-['Timeless'] leading-none">
@@ -249,6 +244,7 @@ export default function SearchBar() {
               <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 sm:pb-0 font-['Timeless']">
                 <button
                   type="button"
+                  disabled={isNlpMode}
                   onClick={() => setQuickDate(0)}
                   className={`w-24 sm:w-26 h-8.5 rounded-full text-xs sm:text-[13.5px] font-semibold border transition-all cursor-pointer inline-flex items-center justify-center leading-none ${
                     date === todayStr
@@ -260,6 +256,7 @@ export default function SearchBar() {
                 </button>
                 <button
                   type="button"
+                  disabled={isNlpMode}
                   onClick={() => setQuickDate(1)}
                   className={`w-24 sm:w-26 h-8.5 rounded-full text-xs sm:text-[13.5px] font-semibold border transition-all cursor-pointer inline-flex items-center justify-center leading-none ${
                     date === new Date(Date.now() + 86400000).toISOString().split('T')[0]
@@ -273,7 +270,92 @@ export default function SearchBar() {
             </div>
           </div>
         </div>
-      )}
+
+        {/* Panel 2: Ask in Plain Language */}
+        <div
+          className={`col-start-1 row-start-1 space-y-3.5 transition-opacity duration-150 ${
+            isNlpMode
+              ? 'opacity-100 relative z-10'
+              : 'opacity-0 pointer-events-none invisible select-none'
+          }`}
+          aria-hidden={!isNlpMode}
+        >
+          {/* Query Input with Matching Label Height */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs sm:text-[13px] font-semibold text-stone-700 uppercase tracking-wider font-['OFLGoudyStM']">
+                Ask in Plain Language (Hindi, Hinglish, English)
+              </label>
+              <span className="text-[11px] font-semibold text-[#4A5D30] bg-[#E5D5BF]/60 px-2.5 py-0.5 rounded-full border border-[#4A5D30]/20 font-['Timeless']">
+                ⚡ Groq AI
+              </span>
+            </div>
+            <div className="relative">
+              <input
+                type="text"
+                value={nlpQuery}
+                onChange={(e) => setNlpQuery(e.target.value)}
+                disabled={!isNlpMode}
+                placeholder={`Try: "${DYNAMIC_PLACEHOLDERS[placeholderIdx]}"`}
+                className="w-full bg-[#FAF7F2] border border-[#4A5D30]/25 rounded-xl px-3.5 py-2 font-['OFLGoudyStM'] text-[#111111] text-sm sm:text-[15px] outline-none focus:bg-white focus:ring-2 focus:ring-[#4A5D30]/30 focus:border-[#4A5D30] placeholder:text-stone-400 transition-all shadow-2xs"
+              />
+              {nlpQuery && (
+                <button
+                  type="button"
+                  onClick={() => setNlpQuery('')}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-[#4A5D30] text-sm font-bold p-1 cursor-pointer"
+                  title="Clear query"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Quick Example Chips with Identical Height to Date Row */}
+          <div className="pt-2 border-t border-[#4A5D30]/15">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 sm:pb-0">
+                <span className="text-xs sm:text-[13px] font-semibold text-stone-700 uppercase tracking-wider shrink-0 font-['OFLGoudyStM'] leading-none">
+                  Try:
+                </span>
+                <div className="flex items-center gap-1.5 font-['Timeless']">
+                  <button
+                    type="button"
+                    disabled={!isNlpMode}
+                    onClick={() => setNlpQuery('Pune se Gwalior agle hafte subah')}
+                    className="h-8.5 px-3 rounded-full text-xs sm:text-[13px] font-semibold border bg-[#FAF7F2] border-[#4A5D30]/20 text-stone-700 hover:bg-[#E5D5BF] transition-all cursor-pointer inline-flex items-center justify-center leading-none active:scale-95"
+                  >
+                    <span className="translate-y-[0.5px]">Pune → Gwalior</span>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!isNlpMode}
+                    onClick={() => setNlpQuery('Delhi to Mumbai before 8 PM')}
+                    className="h-8.5 px-3 rounded-full text-xs sm:text-[13px] font-semibold border bg-[#FAF7F2] border-[#4A5D30]/20 text-stone-700 hover:bg-[#E5D5BF] transition-all cursor-pointer inline-flex items-center justify-center leading-none active:scale-95"
+                  >
+                    <span className="translate-y-[0.5px]">Delhi → Mumbai</span>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!isNlpMode}
+                    onClick={() => setNlpQuery('Kanpur se Lucknow sabse sasta')}
+                    className="hidden md:inline-flex h-8.5 px-3 rounded-full text-xs sm:text-[13px] font-semibold border bg-[#FAF7F2] border-[#4A5D30]/20 text-stone-700 hover:bg-[#E5D5BF] transition-all cursor-pointer items-center justify-center leading-none active:scale-95"
+                  >
+                    <span className="translate-y-[0.5px]">Kanpur → Lucknow</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1.5 shrink-0 font-['Timeless']">
+                <span className="h-8.5 inline-flex items-center justify-center px-3 rounded-full text-xs sm:text-[13px] font-semibold text-[#4A5D30] bg-[#E5D5BF]/60 border border-[#4A5D30]/20 leading-none">
+                  <span className="translate-y-[0.5px]">Bus & Train Aware</span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Error feedback if fields are incomplete */}
       {errorMsg && (

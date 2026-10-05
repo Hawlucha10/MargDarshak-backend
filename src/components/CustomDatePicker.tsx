@@ -4,9 +4,10 @@ interface Props {
   value: string; // ISO date string "YYYY-MM-DD"
   onChange: (dateStr: string) => void;
   minDate?: string; // Optional minimum selectable date "YYYY-MM-DD"
+  disabled?: boolean;
 }
 
-export default function CustomDatePicker({ value, onChange, minDate }: Props) {
+export default function CustomDatePicker({ value, onChange, minDate, disabled = false }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -141,8 +142,9 @@ export default function CustomDatePicker({ value, onChange, minDate }: Props) {
       {/* Trigger Button - Perfectly centered capsule */}
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="h-8.5 inline-flex items-center justify-center gap-2.5 bg-[#FAF7F2] border border-[#4A5D30]/25 hover:border-[#4A5D30] rounded-full px-3.5 text-sm sm:text-[15px] font-['Timeless'] text-[#111111] transition-all shadow-2xs hover:bg-[#F3ECE0] cursor-pointer"
+        disabled={disabled}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        className="h-8.5 inline-flex items-center justify-center gap-2.5 bg-[#FAF7F2] border border-[#4A5D30]/25 hover:border-[#4A5D30] rounded-full px-3.5 text-sm sm:text-[15px] font-['Timeless'] text-[#111111] transition-all shadow-2xs hover:bg-[#F3ECE0] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
       >
         <span className="font-semibold tracking-wide leading-none translate-y-[0.5px]">
           {formatDisplay(value)}

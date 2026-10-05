@@ -12,9 +12,10 @@ interface Props {
   value: string;
   onChange: (code: string, name: string) => void;
   placeholder: string;
+  disabled?: boolean;
 }
 
-export default function StationAutocomplete({ value, onChange, placeholder }: Props) {
+export default function StationAutocomplete({ value, onChange, placeholder, disabled = false }: Props) {
   const [query, setQuery] = useState(value);
   const [suggestions, setSuggestions] = useState<StationSuggestion[]>([]);
   const [isOpen, setIsOpen] = useState(false);
@@ -137,13 +138,14 @@ export default function StationAutocomplete({ value, onChange, placeholder }: Pr
     <div ref={wrapperRef} className="relative w-full">
       <input
         type="text"
+        disabled={disabled}
         value={query}
         onChange={(e) => { setQuery(e.target.value); setSelectedName(''); }}
-        onFocus={() => suggestions.length > 0 && setIsOpen(true)}
+        onFocus={() => !disabled && suggestions.length > 0 && setIsOpen(true)}
         onBlur={handleBlur}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
-        className="w-full bg-[#FAF7F2] border border-[#4A5D30]/25 rounded-xl px-3.5 py-2 font-['OFLGoudyStM'] text-[#111111] text-sm sm:text-[15px] outline-none focus:bg-white focus:ring-2 focus:ring-[#4A5D30]/30 focus:border-[#4A5D30] placeholder:text-stone-400 transition-all shadow-2xs"
+        className="w-full bg-[#FAF7F2] border border-[#4A5D30]/25 rounded-xl px-3.5 py-2 font-['OFLGoudyStM'] text-[#111111] text-sm sm:text-[15px] outline-none focus:bg-white focus:ring-2 focus:ring-[#4A5D30]/30 focus:border-[#4A5D30] placeholder:text-stone-400 transition-all shadow-2xs disabled:opacity-60 disabled:cursor-not-allowed"
       />
       {isOpen && suggestions.length > 0 && (
         <div
