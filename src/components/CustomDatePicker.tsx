@@ -144,13 +144,13 @@ export default function CustomDatePicker({ value, onChange, minDate, disabled = 
         type="button"
         disabled={disabled}
         onClick={() => !disabled && setIsOpen(!isOpen)}
-        className="h-9 sm:h-9.5 inline-flex items-center justify-center gap-2 bg-[#FAF7F2] border border-[#4A5D30]/25 hover:border-[#4A5D30] rounded-full px-3.5 text-[15px] sm:text-[16px] font-['Timeless'] text-[#111111] transition-all shadow-2xs hover:bg-[#F3ECE0] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+        className="h-8 sm:h-8.5 inline-flex items-center justify-center gap-2 bg-[#FAF7F2] border border-[#4A5D30]/25 hover:border-[#4A5D30] rounded-full px-3 text-[12px] sm:text-[13px] font-['Timeless'] text-[#111111] transition-all shadow-2xs hover:bg-[#F3ECE0] cursor-pointer whitespace-nowrap disabled:opacity-60 disabled:cursor-not-allowed"
       >
         <span className="font-semibold tracking-wide leading-none translate-y-[0.5px]">
           {formatDisplay(value)}
         </span>
         <svg
-          className="w-4 h-4 text-[#4A5D30] shrink-0"
+          className="w-3.5 h-3.5 text-[#4A5D30] shrink-0"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"

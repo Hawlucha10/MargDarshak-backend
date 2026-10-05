@@ -156,7 +156,7 @@ export default function SearchBar() {
                 : 'text-stone-700 hover:text-stone-950'
             }`}
           >
-            <span className="translate-y-[0.5px]">Ask in Plain Language</span>
+            <span className="translate-y-[0.5px]">Type it up</span>
           </button>
         </div>
       </div>
@@ -224,7 +224,7 @@ export default function SearchBar() {
           <div className="pt-2.5 border-t border-[#4A5D30]/15">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
               <div className="flex items-center gap-2">
-                <label className="text-[14px] sm:text-[15px] font-semibold text-stone-700 uppercase tracking-wider shrink-0 font-['OFLGoudyStM'] leading-none">
+                <label className="text-[12px] sm:text-[13px] font-semibold text-stone-700 uppercase tracking-wider shrink-0 font-['OFLGoudyStM'] leading-none">
                   Date:
                 </label>
                 <CustomDatePicker
@@ -234,7 +234,7 @@ export default function SearchBar() {
                   disabled={isNlpMode}
                 />
                 {date && (
-                  <span className="hidden sm:inline-flex h-9 sm:h-9.5 items-center justify-center px-3 rounded-full text-[15px] sm:text-[16px] font-semibold text-[#4A5D30] bg-[#E5D5BF]/60 border border-[#4A5D30]/20 font-['Timeless'] leading-none">
+                  <span className="hidden sm:inline-flex h-8 sm:h-8.5 items-center justify-center px-2.5 rounded-full text-[12px] sm:text-[13px] font-medium text-[#4A5D30] bg-[#E5D5BF]/60 border border-[#4A5D30]/20 font-['Timeless'] leading-none whitespace-nowrap">
                     <span className="translate-y-[0.5px]">{getFormattedDatePreview(date)}</span>
                   </span>
                 )}
@@ -246,7 +246,7 @@ export default function SearchBar() {
                   type="button"
                   disabled={isNlpMode}
                   onClick={() => setQuickDate(0)}
-                  className={`w-24 sm:w-26 h-9 sm:h-9.5 rounded-full text-[14px] sm:text-[15.5px] font-semibold border transition-all cursor-pointer inline-flex items-center justify-center leading-none ${
+                  className={`px-3.5 sm:px-4 h-8 sm:h-8.5 rounded-full text-[12px] sm:text-[13px] font-semibold border transition-all cursor-pointer inline-flex items-center justify-center leading-none whitespace-nowrap ${
                     date === todayStr
                       ? 'bg-[#4A5D30] text-[#F6F0E6] border-[#4A5D30] shadow-xs'
                       : 'bg-[#FAF7F2] border-[#4A5D30]/20 text-stone-700 hover:bg-[#E5D5BF]'
@@ -258,7 +258,7 @@ export default function SearchBar() {
                   type="button"
                   disabled={isNlpMode}
                   onClick={() => setQuickDate(1)}
-                  className={`w-24 sm:w-26 h-9 sm:h-9.5 rounded-full text-[14px] sm:text-[15.5px] font-semibold border transition-all cursor-pointer inline-flex items-center justify-center leading-none ${
+                  className={`px-3.5 sm:px-4 h-8 sm:h-8.5 rounded-full text-[12px] sm:text-[13px] font-semibold border transition-all cursor-pointer inline-flex items-center justify-center leading-none whitespace-nowrap ${
                     date === new Date(Date.now() + 86400000).toISOString().split('T')[0]
                       ? 'bg-[#4A5D30] text-[#F6F0E6] border-[#4A5D30] shadow-xs'
                       : 'bg-[#FAF7F2] border-[#4A5D30]/20 text-stone-700 hover:bg-[#E5D5BF]'
@@ -284,7 +284,7 @@ export default function SearchBar() {
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="block text-[14px] sm:text-[15px] font-semibold text-stone-700 uppercase tracking-wider font-['OFLGoudyStM']">
-                Ask in Plain Language (Hindi, Hinglish, English)
+                Type it up (Hindi, Hinglish, English)
               </label>
             </div>
             <div className="relative">
@@ -313,7 +313,7 @@ export default function SearchBar() {
           <div className="pt-2.5 border-t border-[#4A5D30]/15">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
               <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 sm:pb-0">
-                <span className="text-[14px] sm:text-[15px] font-semibold text-stone-700 uppercase tracking-wider shrink-0 font-['OFLGoudyStM'] leading-none">
+                <span className="text-[12px] sm:text-[13px] font-semibold text-stone-700 uppercase tracking-wider shrink-0 font-['OFLGoudyStM'] leading-none">
                   Try:
                 </span>
                 <div className="flex items-center gap-1.5 font-['Timeless']">
@@ -321,7 +321,7 @@ export default function SearchBar() {
                     type="button"
                     disabled={!isNlpMode}
                     onClick={() => setNlpQuery('Pune se Gwalior agle hafte subah')}
-                    className="h-9 sm:h-9.5 px-3 rounded-full text-[14px] sm:text-[15px] font-semibold border bg-[#FAF7F2] border-[#4A5D30]/20 text-stone-700 hover:bg-[#E5D5BF] transition-all cursor-pointer inline-flex items-center justify-center leading-none active:scale-95"
+                    className="h-8 sm:h-8.5 px-3 rounded-full text-[12px] sm:text-[13px] font-semibold border bg-[#FAF7F2] border-[#4A5D30]/20 text-stone-700 hover:bg-[#E5D5BF] transition-all cursor-pointer inline-flex items-center justify-center leading-none whitespace-nowrap active:scale-95"
                   >
                     <span className="translate-y-[0.5px]">Pune → Gwalior</span>
                   </button>
@@ -329,7 +329,7 @@ export default function SearchBar() {
                     type="button"
                     disabled={!isNlpMode}
                     onClick={() => setNlpQuery('Delhi to Mumbai before 8 PM')}
-                    className="h-9 sm:h-9.5 px-3 rounded-full text-[14px] sm:text-[15px] font-semibold border bg-[#FAF7F2] border-[#4A5D30]/20 text-stone-700 hover:bg-[#E5D5BF] transition-all cursor-pointer inline-flex items-center justify-center leading-none active:scale-95"
+                    className="h-8 sm:h-8.5 px-3 rounded-full text-[12px] sm:text-[13px] font-semibold border bg-[#FAF7F2] border-[#4A5D30]/20 text-stone-700 hover:bg-[#E5D5BF] transition-all cursor-pointer inline-flex items-center justify-center leading-none whitespace-nowrap active:scale-95"
                   >
                     <span className="translate-y-[0.5px]">Delhi → Mumbai</span>
                   </button>
@@ -337,7 +337,7 @@ export default function SearchBar() {
                     type="button"
                     disabled={!isNlpMode}
                     onClick={() => setNlpQuery('Kanpur se Lucknow sabse sasta')}
-                    className="hidden md:inline-flex h-9 sm:h-9.5 px-3 rounded-full text-[14px] sm:text-[15px] font-semibold border bg-[#FAF7F2] border-[#4A5D30]/20 text-stone-700 hover:bg-[#E5D5BF] transition-all cursor-pointer items-center justify-center leading-none active:scale-95"
+                    className="hidden md:inline-flex h-8 sm:h-8.5 px-3 rounded-full text-[12px] sm:text-[13px] font-semibold border bg-[#FAF7F2] border-[#4A5D30]/20 text-stone-700 hover:bg-[#E5D5BF] transition-all cursor-pointer items-center justify-center leading-none whitespace-nowrap active:scale-95"
                   >
                     <span className="translate-y-[0.5px]">Kanpur → Lucknow</span>
                   </button>
@@ -345,7 +345,7 @@ export default function SearchBar() {
               </div>
 
               <div className="flex items-center gap-1.5 shrink-0 font-['Timeless']">
-                <span className="h-9 sm:h-9.5 inline-flex items-center justify-center px-3 rounded-full text-[14px] sm:text-[15px] font-semibold text-[#4A5D30] bg-[#E5D5BF]/60 border border-[#4A5D30]/20 leading-none">
+                <span className="h-8 sm:h-8.5 inline-flex items-center justify-center px-2.5 rounded-full text-[12px] sm:text-[13px] font-semibold text-[#4A5D30] bg-[#E5D5BF]/60 border border-[#4A5D30]/20 leading-none whitespace-nowrap">
                   <span className="translate-y-[0.5px]">Bus & Train Aware</span>
                 </span>
               </div>
