@@ -80,6 +80,20 @@ export default function ResultsPage() {
         const data = await res.json();
         setResults(data);
         setSelectedRouteId('route-0');
+        if (data.nlp_interpretation?.priority) {
+          const p = data.nlp_interpretation.priority.toUpperCase();
+          if (p === 'MULTIMODAL' || data.nlp_interpretation?.bus_only || nlp.toLowerCase().includes('bus')) {
+            setSelectedFilter('MULTIMODAL');
+          } else if (p === 'FASTEST') {
+            setSelectedFilter('FASTEST');
+          } else if (p === 'CHEAPEST') {
+            setSelectedFilter('CHEAPEST');
+          } else if (p === 'COMFORT') {
+            setSelectedFilter('COMFORT_HOMESTAY');
+          } else if (p === 'RELIABLE') {
+            setSelectedFilter('MOST_RELIABLE');
+          }
+        }
       } else {
         const origin = searchParams.get('origin') || 'PUNE';
         const destination = searchParams.get('destination') || 'GWL';
