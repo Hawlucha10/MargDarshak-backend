@@ -321,7 +321,7 @@ export const RouteTile: React.FC<RouteTileProps> = ({
                         </div>
                         <div>
                           <span className="text-[#64748B]">Connection Safety:</span>{' '}
-                          <span className="font-bold text-[#15803D]">GUARANTEED (P85 SAFE)</span>
+                          <span className="font-bold text-[#15803D]">GUARANTEED SAFE</span>
                         </div>
                         <div>
                           <span className="text-[#64748B]">Navigation:</span>{' '}

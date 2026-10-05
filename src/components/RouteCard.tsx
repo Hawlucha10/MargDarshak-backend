@@ -56,6 +56,8 @@ export interface RouteItem {
   trainNumber: string;
   departure: string;
   arrival: string;
+  departureDate?: string;
+  arrivalDate?: string;
   duration: string;
   fare: string;
   transfers?: number;
@@ -91,6 +93,13 @@ const LABEL_STYLES: Record<string, string> = {
   FEWEST_TRANSFERS: 'bg-purple-50 text-purple-800 border-purple-200',
   ALTERNATIVE: 'bg-brand-cream text-brand-text-muted border-stone-200',
 };
+
+function formatLayover(minutes: number): string {
+  if (minutes < 60) return `${minutes} min layover`;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return m > 0 ? `${h}h ${String(m).padStart(2, '0')}m layover` : `${h}h layover`;
+}
 
 export default function RouteCard({ route, index, isActive, onSelect }: RouteProps) {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -145,7 +154,9 @@ export default function RouteCard({ route, index, isActive, onSelect }: RoutePro
       <div className="flex items-center justify-between font-['Timeless'] text-sm mb-4 bg-[#FAF7F2] px-4 py-3 rounded-xl border border-stone-200/60">
         <div className="text-left font-['Timeless']">
           <p className="font-bold text-[#111111] text-base font-['Timeless']">{route.departure}</p>
-          <span className="text-[11px] text-stone-500 font-['Timeless']">Departure</span>
+          <span className="text-[11px] text-stone-500 font-['Timeless'] block mt-0.5">
+            {route.departureDate ? `${route.departureDate} · Departure` : 'Departure'}
+          </span>
         </div>
         <div className="flex-1 px-4 flex flex-col items-center font-['Timeless']">
           <span className="text-[#4A5D30] font-['Timeless'] text-xs font-semibold mb-1">
@@ -159,7 +170,9 @@ export default function RouteCard({ route, index, isActive, onSelect }: RoutePro
         </div>
         <div className="text-right font-['Timeless']">
           <p className="font-bold text-[#111111] text-base font-['Timeless']">{route.arrival}</p>
-          <span className="text-[11px] text-stone-500 font-['Timeless']">Arrival</span>
+          <span className="text-[11px] text-stone-500 font-['Timeless'] block mt-0.5">
+            {route.arrivalDate ? `${route.arrivalDate} · Arrival` : 'Arrival'}
+          </span>
         </div>
       </div>
 
@@ -237,7 +250,7 @@ export default function RouteCard({ route, index, isActive, onSelect }: RoutePro
                   </div>
                   {leg.predicted_delay_min > 0 && (
                     <div className="mt-2 text-[11px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded inline-block">
-                      Predicted Delay: +{leg.predicted_delay_min}m (P85 safety buffer included)
+                      Predicted Delay: +{leg.predicted_delay_min}m
                     </div>
                   )}
                 </div>
@@ -253,7 +266,7 @@ export default function RouteCard({ route, index, isActive, onSelect }: RoutePro
                   <div className="flex items-center justify-between font-semibold mb-1">
                     <span>Transfer at {t.station_name} ({t.station_code})</span>
                     <span className="bg-blue-100 text-blue-800 border border-blue-200/60 px-2 py-0.5 rounded-md text-[11px]">
-                      {t.wait_time_minutes} min layover
+                      {formatLayover(t.wait_time_minutes)}
                     </span>
                   </div>
                   <p className="text-blue-800 text-[11px]">{t.interchange_guide}</p>

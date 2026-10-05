@@ -192,7 +192,7 @@ export const SearchForm: React.FC<SearchFormProps> = ({ onSearch, isLoading }) =
                   onChange={(e) => setPriority(e.target.value)}
                   className="w-full bg-transparent font-mono font-bold text-xs sm:text-sm text-[#0F172A] outline-none cursor-pointer"
                 >
-                  <option value="balanced">BALANCED (5-Criteria Pareto Front)</option>
+                  <option value="balanced">BALANCED (Optimal Multi-Criteria)</option>
                   <option value="fastest">FASTEST (Minimum Total Travel Time)</option>
                   <option value="cheapest">CHEAPEST (Maximum Fare Arbitrage)</option>
                   <option value="reliable">MOST RELIABLE (Gaussian P(Arrival))</option>

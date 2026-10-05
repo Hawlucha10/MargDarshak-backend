@@ -46,7 +46,7 @@ const FILTER_ITEMS: Array<{
   icon: React.ElementType;
 }> = [
   { key: 'ALL', label: 'All Options', icon: Layers },
-  { key: 'PARETO_FRONTIER', label: 'Pareto Frontier', icon: Sparkles },
+  { key: 'PARETO_FRONTIER', label: 'Recommended', icon: Sparkles },
   { key: 'FASTEST', label: 'Fastest', icon: Zap },
   { key: 'CHEAPEST', label: 'Cheapest', icon: Coins },
   { key: 'BALANCED', label: 'Balanced', icon: Scale },
@@ -65,19 +65,11 @@ export const ParetoFilterBar: React.FC<ParetoFilterBarProps> = ({
   return (
     <div className="bg-white/90 backdrop-blur-md rounded-2xl p-4 mb-5 border border-white/80 shadow-xs flex flex-col gap-3 font-['Timeless']">
       {/* Top Header: Title + Sort Dropdown */}
-      <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-stone-100">
+      <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-stone-100">
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-lg bg-[#4A5D30]/15 flex items-center justify-center text-[#4A5D30]">
-            <Sparkles className="w-3.5 h-3.5" />
-          </div>
-          <div>
-            <h3 className="font-['Timeless'] text-sm font-bold text-[#4A5D30] tracking-tight">
-              Pareto Multi-Criteria Trade-offs
-            </h3>
-            <p className="text-[11px] font-['Timeless'] text-stone-500">
-              Filter non-dominated solutions across time, budget, reliability & comfort
-            </p>
-          </div>
+          <h3 className="font-['Timeless'] text-sm font-bold text-[#4A5D30] tracking-tight">
+            Filter
+          </h3>
         </div>
 
         {/* Sort Controls */}
@@ -91,7 +83,7 @@ export const ParetoFilterBar: React.FC<ParetoFilterBarProps> = ({
             onChange={(e) => onSelectSort(e.target.value)}
             className="bg-stone-50 hover:bg-stone-100 text-[#4A5D30] font-semibold py-1 px-2.5 rounded-lg border border-stone-200 outline-none text-xs transition-colors cursor-pointer font-['Timeless']"
           >
-            <option value="pareto">Pareto Rank</option>
+            <option value="best_match">Best Match</option>
             <option value="duration">Fastest Duration</option>
             <option value="fare">Lowest Fare</option>
             <option value="reliability">Highest Reliability</option>

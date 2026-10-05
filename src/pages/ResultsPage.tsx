@@ -28,6 +28,11 @@ interface SearchResponse {
     is_multimodal?: boolean;
     time_saved_vs_train_minutes?: number | null;
     comfort_score?: number | null;
+    departure_time?: string;
+    arrival_time?: string;
+    departure_date?: string;
+    arrival_date?: string;
+    total_travel_minutes?: number;
   }>;
   computed_in_ms: number;
   nlp_query?: string | null;
@@ -43,11 +48,48 @@ const POPULAR_SUGGESTIONS = [
   { label: 'Ahmedabad → Jaipur', query: 'Ahmedabad to Jaipur sleeper' },
 ];
 
+const LOADING_MESSAGES = [
+  'Optimizing your route...',
+  'Searching optimal rail & bus routes...',
+  'Evaluating fastest transfer combinations...',
+  'Calculating best connection schedules...',
+];
+
+function timeStrToMinutes(t?: string): number {
+  if (!t) return 0;
+  const parts = t.split(':');
+  return (parseInt(parts[0]) || 0) * 60 + (parseInt(parts[1]) || 0);
+}
+
+function formatDateBadge(dateStr?: string, daysToAdd: number = 0): string {
+  if (!dateStr) return '';
+  try {
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      const year = parseInt(parts[0]);
+      const monthIdx = parseInt(parts[1]) - 1;
+      const day = parseInt(parts[2]);
+      const d = new Date(year, monthIdx, day);
+      if (daysToAdd > 0) {
+        d.setDate(d.getDate() + daysToAdd);
+      }
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const mName = months[d.getMonth()];
+      const dNum = d.getDate();
+      return daysToAdd > 0 ? `${dNum} ${mName} (+${daysToAdd}d)` : `${dNum} ${mName}`;
+    }
+    return dateStr;
+  } catch {
+    return dateStr;
+  }
+}
+
 export default function ResultsPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [results, setResults] = useState<SearchResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingMsgIndex, setLoadingMsgIndex] = useState(0);
   const [error, setError] = useState('');
   const [selectedRouteId, setSelectedRouteId] = useState<string>('route-0');
   const [selectedFilter, setSelectedFilter] = useState<ParetoFilterKey>(() => {
@@ -62,8 +104,16 @@ export default function ResultsPage() {
     if (upper === 'PARETO' || upper === 'PARETO_FRONTIER') return 'PARETO_FRONTIER';
     return 'ALL';
   });
-  const [sortBy, setSortBy] = useState<string>('pareto');
+  const [sortBy, setSortBy] = useState<string>('best_match');
   const [clarifyInput, setClarifyInput] = useState('');
+
+  useEffect(() => {
+    if (!loading) return;
+    const interval = setInterval(() => {
+      setLoadingMsgIndex((prev) => (prev + 1) % LOADING_MESSAGES.length);
+    }, 1800);
+    return () => clearInterval(interval);
+  }, [loading]);
 
   const fetchRoutes = useCallback(async () => {
     setLoading(true);
@@ -160,11 +210,73 @@ export default function ResultsPage() {
       computedNumber = `BUS // ${firstBus?.operator_code || 'HIGHWAY'}`;
     }
 
-    const computedDeparture = (firstLeg?.departure_time || firstBus?.departure_time || '--:--').slice(0, 5);
-    const computedArrival = (lastBus && (!lastLeg || r.is_multimodal)
-      ? lastBus.arrival_time
-      : (lastLeg?.arrival_time || lastBus?.arrival_time || '--:--')
-    ).slice(0, 5);
+    const computedDeparture = (r.departure_time || firstLeg?.departure_time || firstBus?.departure_time || '--:--').slice(0, 5);
+
+    // Accurate arrival time resolution:
+    let computedArrival: string = r.arrival_time?.slice(0, 5) || '';
+    if (!computedArrival) {
+      if (hasTrains && hasBuses) {
+        if (results?.destination && lastLeg?.to_station === results.destination) {
+          computedArrival = (lastLeg?.arrival_time || '--:--').slice(0, 5);
+        } else if (results?.destination && lastBus?.to_station_code === results.destination) {
+          computedArrival = (lastBus?.arrival_time || '--:--').slice(0, 5);
+        } else {
+          const lastTransfer = r.transfers_info && r.transfers_info[r.transfers_info.length - 1];
+          if (lastTransfer && lastTransfer.interchange_guide?.includes('Board Train')) {
+            computedArrival = (lastLeg?.arrival_time || lastBus?.arrival_time || '--:--').slice(0, 5);
+          } else {
+            computedArrival = (lastBus?.arrival_time || lastLeg?.arrival_time || '--:--').slice(0, 5);
+          }
+        }
+      } else if (hasTrains) {
+        computedArrival = (lastLeg?.arrival_time || '--:--').slice(0, 5);
+      } else if (hasBuses) {
+        computedArrival = (lastBus?.arrival_time || '--:--').slice(0, 5);
+      } else {
+        computedArrival = '--:--';
+      }
+    }
+    if (!computedArrival) {
+      computedArrival = '--:--';
+    }
+
+    // Accurate total duration calculation:
+    // Sum of all train leg durations + bus leg durations + transfer layovers
+    let totalMins = 0;
+    if (r.legs) {
+      for (const leg of r.legs) {
+        const dM = timeStrToMinutes(leg.departure_time);
+        const aM = timeStrToMinutes(leg.arrival_time);
+        const diff = aM >= dM ? aM - dM : aM - dM + 1440;
+        totalMins += Math.max(10, diff);
+      }
+    }
+    if (r.bus_legs) {
+      for (const b of r.bus_legs) {
+        totalMins += b.duration_minutes || 180;
+      }
+    }
+    if (r.transfers_info) {
+      for (const t of r.transfers_info) {
+        totalMins += t.wait_time_minutes || 0;
+      }
+    }
+
+    const computedDuration = totalMins > 0
+      ? `${Math.floor(totalMins / 60)}h ${String(totalMins % 60).padStart(2, '0')}m`
+      : r.total_travel_time;
+
+    const departureDate = r.departure_date || formatDateBadge(results?.travel_date, 0);
+
+    let arrivalDate = r.arrival_date;
+    if (!arrivalDate && results?.travel_date && computedDeparture !== '--:--' && totalMins > 0) {
+      const depMins = timeStrToMinutes(computedDeparture);
+      const totalArrivalMins = depMins + totalMins;
+      const daysDiff = Math.floor(totalArrivalMins / 1440);
+      arrivalDate = formatDateBadge(results.travel_date, daysDiff);
+    } else if (!arrivalDate) {
+      arrivalDate = departureDate;
+    }
 
     return {
       id: `route-${i}`,
@@ -173,21 +285,23 @@ export default function ResultsPage() {
       trainNumber: computedNumber,
       departure: computedDeparture,
       arrival: computedArrival,
-      duration: r.total_travel_time,
+      departureDate,
+      arrivalDate,
+      duration: computedDuration,
       fare: r.total_fare ? `₹${r.total_fare}` : '--',
-    transfers: r.transfers,
-    reliability: r.joint_reliability_percent || `${Math.round(r.reliability_score * 100)}%`,
-    hasBusLeg: Boolean(r.is_multimodal || (r.bus_legs && r.bus_legs.length > 0)),
-    isComfortable: r.label === 'COMFORT_HOMESTAY',
-    isMultimodal: r.is_multimodal,
-    legs: r.legs,
-    bus_legs: r.bus_legs,
-    transfers_info: r.transfers_info,
-    fare_arbitrage_tip: r.fare_arbitrage_tip,
-    accessibility_badge: r.accessibility_badge,
-    weather_advisory: r.weather_advisory,
-    time_saved_vs_train_minutes: r.time_saved_vs_train_minutes,
-    comfort_score: r.comfort_score,
+      transfers: r.transfers,
+      reliability: r.joint_reliability_percent || `${Math.round(r.reliability_score * 100)}%`,
+      hasBusLeg: Boolean(r.is_multimodal || (r.bus_legs && r.bus_legs.length > 0)),
+      isComfortable: r.label === 'COMFORT_HOMESTAY',
+      isMultimodal: r.is_multimodal,
+      legs: r.legs,
+      bus_legs: r.bus_legs,
+      transfers_info: r.transfers_info,
+      fare_arbitrage_tip: r.fare_arbitrage_tip,
+      accessibility_badge: r.accessibility_badge,
+      weather_advisory: r.weather_advisory,
+      time_saved_vs_train_minutes: r.time_saved_vs_train_minutes,
+      comfort_score: r.comfort_score,
     };
   });
 
@@ -274,11 +388,6 @@ export default function ResultsPage() {
                   ? `${results.total_routes_found} Optimal Routes`
                   : 'No Direct Routes Found'}
               </h2>
-              {results && !loading && (
-                <span className="text-xs font-['Timeless'] bg-[#F6F0E6] text-[#4A5D30] px-3 py-1 rounded-lg font-semibold border border-[#4A5D30]/25 shadow-2xs">
-                  ⚡ {results.computed_in_ms} ms
-                </span>
-              )}
             </div>
             {results && !loading && !needsClarification && (
               <p className="text-xs font-['Timeless'] text-stone-700 mt-1 uppercase tracking-wider font-semibold">
@@ -345,49 +454,15 @@ export default function ResultsPage() {
             </div>
           )}
 
-          {/* AI & NLP Understanding Area (When NOT needing clarification) */}
-          {results && !loading && !needsClarification && (
-            <div className="bg-[#F6F0E6] rounded-2xl p-4.5 mb-5 border border-[#4A5D30]/20 shadow-xs font-['Timeless']">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="w-2.5 h-2.5 rounded-xs bg-[#4A5D30] animate-pulse" />
-                <h3 className="font-['Timeless'] text-sm font-bold text-[#4A5D30] tracking-wide uppercase">
-                  AI Route Insights & NLP Parsing
-                </h3>
-              </div>
-
-              {nlpQuery && (
-                <div className="bg-[#E5D5BF]/60 px-3 py-2 rounded-xl border border-[#4A5D30]/15 mb-2.5 text-xs font-['Timeless'] text-stone-700 italic">
-                  &ldquo;{nlpQuery}&rdquo;
-                </div>
-              )}
-
-              <p className="text-xs font-['Timeless'] text-stone-700 leading-relaxed">
-                {results.ai_summary ||
-                  `Identified ${results.total_routes_found} multi-criteria Pareto trade-offs across train schedules and connecting bus lines.`}
-              </p>
-
-              {/* Extracted Entity Tags: rounded-md, no capsules */}
-              <div className="flex flex-wrap gap-1.5 mt-3 pt-2.5 border-t border-[#4A5D30]/15 text-[11px] font-['Timeless']">
-                <span className="bg-[#4A5D30]/15 text-[#4A5D30] px-2.5 py-1 rounded-md font-semibold border border-[#4A5D30]/25">
-                  {results.origin} → {results.destination}
-                </span>
-                <span className="bg-[#5A6B3C]/15 text-[#4A5D30] px-2.5 py-1 rounded-md font-semibold border border-[#5A6B3C]/25">
-                  📅 {results.travel_date}
-                </span>
-                {entities?.arrive_before_time && (
-                  <span className="bg-amber-100 text-amber-900 px-2.5 py-1 rounded-md font-semibold border border-amber-200">
-                    ⏰ Arrive before {entities.arrive_before_time}
-                  </span>
-                )}
-                {entities?.prefer_home_wait && (
-                  <span className="bg-emerald-100 text-emerald-900 px-2.5 py-1 rounded-md font-semibold border border-emerald-200">
-                    🏠 Wait-at-Home Comfort Active
-                  </span>
-                )}
-                <span className="bg-stone-100 text-stone-700 px-2.5 py-1 rounded-md font-medium border border-stone-200/60">
-                  🚌 Bus Bridging Active
-                </span>
-              </div>
+          {/* Route Insights Header */}
+          {results && !loading && !needsClarification && nlpQuery && (
+            <div className="flex items-center gap-2 mb-3.5 font-['Timeless']">
+              <h3 className="font-['Timeless'] text-sm font-bold text-[#4A5D30] tracking-wide">
+                Route Insights
+              </h3>
+              <span className="bg-[#F6F0E6] text-stone-700 text-xs px-2.5 py-1 rounded-md border border-[#4A5D30]/20 italic font-medium">
+                &ldquo;{nlpQuery}&rdquo;
+              </span>
             </div>
           )}
 
@@ -395,8 +470,8 @@ export default function ResultsPage() {
           {loading && (
             <div className="flex-1 flex flex-col items-center justify-center py-20 font-['Timeless']">
               <div className="w-10 h-10 border-3 border-[#4A5D30]/30 border-t-[#4A5D30] rounded-xl animate-spin" />
-              <p className="mt-4 text-[#4A5D30] font-['Timeless'] text-sm font-semibold">
-                Scanning 22,000 trains, P85 delay buffers & bus corridors...
+              <p className="mt-4 text-[#4A5D30] font-['Timeless'] text-sm font-semibold transition-all duration-300">
+                {LOADING_MESSAGES[loadingMsgIndex]}
               </p>
             </div>
           )}
@@ -415,7 +490,7 @@ export default function ResultsPage() {
             </div>
           )}
 
-          {/* Pareto Multi-Criteria Filter Bar */}
+          {/* Filter Bar */}
           {!loading && !error && !needsClarification && results && results.total_routes_found > 0 && (
             <ParetoFilterBar
               selectedFilter={selectedFilter}
@@ -459,7 +534,7 @@ export default function ResultsPage() {
                     No routes found matching filter &ldquo;{selectedFilter.replace(/_/g, ' ')}&rdquo;
                   </p>
                   <p className="text-xs text-stone-600 mb-4 font-['Timeless']">
-                    Try switching back to All Routes or another Pareto trade-off criterion.
+                    Try switching back to All Routes or another filter.
                   </p>
                   <button
                     type="button"

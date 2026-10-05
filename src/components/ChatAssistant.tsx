@@ -124,12 +124,12 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({
   };
 
   return (
-    <div className={`fixed z-50 font-['Timeless'] ${isOpen ? 'bottom-6 right-4 sm:right-6' : 'bottom-[108px] sm:bottom-[118px] right-6 sm:right-8'}`}>
-      {/* Floating Toggle Button - Shifted comfortably upwards above the footer strip */}
+    <div className={`fixed z-50 font-['Timeless'] ${isOpen ? 'bottom-6 right-4 sm:right-6' : 'bottom-[26px] sm:bottom-[28px] left-1/2 -translate-x-1/2'}`}>
+      {/* Floating Toggle Button - In the middle of page and bottom stripe */}
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="group flex items-center gap-3 px-5 py-3.5 bg-[#4A5D30] hover:bg-[#3D4C27] text-[#F6F0E6] rounded-full shadow-2xl transition-all duration-300 hover:scale-105 active:scale-95 border-2 border-[#E5D5BF]"
+          className="group flex items-center gap-2.5 px-5 py-2.5 sm:py-3 bg-[#4A5D30] hover:bg-[#3D4C27] text-[#F6F0E6] rounded-full shadow-2xl transition-all duration-300 hover:scale-105 active:scale-95 border-2 border-[#E5D5BF] whitespace-nowrap cursor-pointer"
           aria-label="Open MargDarshak AI Travel Assistant"
         >
           <div className="relative">
