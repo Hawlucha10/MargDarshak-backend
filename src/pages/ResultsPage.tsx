@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import RouteMap from '../components/RouteMap';
 import RouteCard, { type RouteItem } from '../components/RouteCard';
+import ParetoFilterBar, { type ParetoFilterKey, type ParetoFilterCounts } from '../components/ParetoFilterBar';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -48,7 +49,20 @@ export default function ResultsPage() {
   const [results, setResults] = useState<SearchResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [activeRouteIdx, setActiveRouteIdx] = useState<number>(0);
+  const [selectedRouteId, setSelectedRouteId] = useState<string>('route-0');
+  const [selectedFilter, setSelectedFilter] = useState<ParetoFilterKey>(() => {
+    const p = searchParams.get('priority') || searchParams.get('filter') || 'ALL';
+    const upper = p.toUpperCase();
+    if (upper === 'FASTEST') return 'FASTEST';
+    if (upper === 'CHEAPEST') return 'CHEAPEST';
+    if (upper === 'BALANCED') return 'BALANCED';
+    if (upper === 'RELIABLE' || upper === 'MOST_RELIABLE') return 'MOST_RELIABLE';
+    if (upper === 'COMFORT' || upper === 'COMFORT_HOMESTAY') return 'COMFORT_HOMESTAY';
+    if (upper === 'MULTIMODAL' || upper === 'MULTIMODAL_FASTEST') return 'MULTIMODAL';
+    if (upper === 'PARETO' || upper === 'PARETO_FRONTIER') return 'PARETO_FRONTIER';
+    return 'ALL';
+  });
+  const [sortBy, setSortBy] = useState<string>('pareto');
   const [clarifyInput, setClarifyInput] = useState('');
 
   const fetchRoutes = useCallback(async () => {
@@ -65,7 +79,7 @@ export default function ResultsPage() {
         if (!res.ok) throw new Error('Search failed. Please try a different query.');
         const data = await res.json();
         setResults(data);
-        setActiveRouteIdx(0);
+        setSelectedRouteId('route-0');
       } else {
         const origin = searchParams.get('origin') || 'PUNE';
         const destination = searchParams.get('destination') || 'GWL';
@@ -87,7 +101,7 @@ export default function ResultsPage() {
         if (!res.ok) throw new Error('Search failed. Please check station codes.');
         const data = await res.json();
         setResults(data);
-        setActiveRouteIdx(0);
+        setSelectedRouteId('route-0');
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not fetch routes');
@@ -100,7 +114,11 @@ export default function ResultsPage() {
     fetchRoutes();
   }, [fetchRoutes]);
 
-  const activeRoute = results?.routes && results.routes.length > 0 ? results.routes[activeRouteIdx] : null;
+  const activeRoute = useMemo(() => {
+    if (!results?.routes || results.routes.length === 0) return null;
+    const matchIndex = results.routes.findIndex((_, idx) => `route-${idx}` === selectedRouteId);
+    return matchIndex >= 0 ? results.routes[matchIndex] : results.routes[0];
+  }, [results, selectedRouteId]);
 
   const routeCards: RouteItem[] = (results?.routes || []).map((r, i) => {
     const hasTrains = Boolean(r.legs && r.legs.length > 0);
@@ -158,6 +176,53 @@ export default function ResultsPage() {
     comfort_score: r.comfort_score,
     };
   });
+
+  const paretoCounts: ParetoFilterCounts = useMemo(() => ({
+    ALL: routeCards.length,
+    PARETO_FRONTIER: routeCards.filter((r) => r.label && r.label !== 'ALTERNATIVE').length,
+    FASTEST: routeCards.filter((r) => r.label === 'FASTEST').length,
+    CHEAPEST: routeCards.filter((r) => r.label === 'CHEAPEST').length,
+    BALANCED: routeCards.filter((r) => r.label === 'BALANCED').length,
+    MOST_RELIABLE: routeCards.filter((r) => r.label === 'MOST_RELIABLE').length,
+    COMFORT_HOMESTAY: routeCards.filter((r) => r.label === 'COMFORT_HOMESTAY').length,
+    MULTIMODAL: routeCards.filter((r) => r.isMultimodal || r.hasBusLeg || r.label === 'MULTIMODAL_FASTEST').length,
+  }), [routeCards]);
+
+  const displayedRouteCards = useMemo(() => {
+    const filtered = routeCards.filter((r) => {
+      if (selectedFilter === 'ALL') return true;
+      if (selectedFilter === 'PARETO_FRONTIER') return r.label && r.label !== 'ALTERNATIVE';
+      if (selectedFilter === 'FASTEST') return r.label === 'FASTEST';
+      if (selectedFilter === 'CHEAPEST') return r.label === 'CHEAPEST';
+      if (selectedFilter === 'BALANCED') return r.label === 'BALANCED';
+      if (selectedFilter === 'MOST_RELIABLE') return r.label === 'MOST_RELIABLE';
+      if (selectedFilter === 'COMFORT_HOMESTAY') return r.label === 'COMFORT_HOMESTAY';
+      if (selectedFilter === 'MULTIMODAL') return r.isMultimodal || r.hasBusLeg || r.label === 'MULTIMODAL_FASTEST';
+      return true;
+    });
+
+    return [...filtered].sort((a, b) => {
+      if (sortBy === 'duration') {
+        const getMin = (s: string) => {
+          const parts = s.split('h');
+          return (parseInt(parts[0]) || 0) * 60 + (parseInt(parts[1]?.replace('m', '')) || 0);
+        };
+        return getMin(a.duration) - getMin(b.duration);
+      }
+      if (sortBy === 'fare') {
+        const parseFare = (f: string) => parseInt(f.replace('₹', '')) || 9999;
+        return parseFare(a.fare) - parseFare(b.fare);
+      }
+      if (sortBy === 'reliability') {
+        const parseRel = (rel?: string) => parseInt(rel?.replace('%', '') || '0');
+        return parseRel(b.reliability) - parseRel(a.reliability);
+      }
+      if (sortBy === 'comfort') {
+        return (a.comfort_score || 9999) - (b.comfort_score || 9999);
+      }
+      return 0; // Default: Pareto rank
+    });
+  }, [routeCards, selectedFilter, sortBy]);
 
   const nlpQuery = searchParams.get('nlp') || results?.nlp_query;
   const entities = results?.nlp_interpretation;
@@ -349,18 +414,64 @@ export default function ResultsPage() {
           </div>
         )}
 
+        {/* Pareto Multi-Criteria Filter Bar */}
+        {!loading && !error && !needsClarification && results && results.total_routes_found > 0 && (
+          <ParetoFilterBar
+            selectedFilter={selectedFilter}
+            onSelectFilter={(key) => {
+              setSelectedFilter(key);
+              const matching = routeCards.find((r) => {
+                if (key === 'ALL') return true;
+                if (key === 'PARETO_FRONTIER') return r.label && r.label !== 'ALTERNATIVE';
+                if (key === 'FASTEST') return r.label === 'FASTEST';
+                if (key === 'CHEAPEST') return r.label === 'CHEAPEST';
+                if (key === 'BALANCED') return r.label === 'BALANCED';
+                if (key === 'MOST_RELIABLE') return r.label === 'MOST_RELIABLE';
+                if (key === 'COMFORT_HOMESTAY') return r.label === 'COMFORT_HOMESTAY';
+                if (key === 'MULTIMODAL') return r.isMultimodal || r.hasBusLeg || r.label === 'MULTIMODAL_FASTEST';
+                return true;
+              });
+              if (matching) setSelectedRouteId(matching.id);
+            }}
+            sortBy={sortBy}
+            onSelectSort={setSortBy}
+            counts={paretoCounts}
+          />
+        )}
+
         {/* Route Cards List */}
         {!loading && !error && !needsClarification && (
           <div className="flex flex-col gap-4 pb-8">
-            {routeCards.map((route, i) => (
-              <RouteCard
-                key={route.id}
-                route={route}
-                index={i}
-                isActive={activeRouteIdx === i}
-                onSelect={() => setActiveRouteIdx(i)}
-              />
-            ))}
+            {displayedRouteCards.length > 0 ? (
+              displayedRouteCards.map((route, i) => (
+                <RouteCard
+                  key={route.id}
+                  route={route}
+                  index={i}
+                  isActive={selectedRouteId === route.id}
+                  onSelect={() => setSelectedRouteId(route.id)}
+                />
+              ))
+            ) : (
+              <div className="bg-white/95 backdrop-blur-md rounded-2xl p-6 text-center border border-stone-200/80 shadow-xs">
+                <p className="font-serif text-base font-bold text-[#1A2766] mb-1">
+                  No routes found matching filter &ldquo;{selectedFilter.replace(/_/g, ' ')}&rdquo;
+                </p>
+                <p className="text-xs text-stone-600 mb-4 font-[var(--font-ui)]">
+                  Try switching back to All Routes or another Pareto trade-off criterion.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedFilter('ALL');
+                    if (routeCards.length > 0) setSelectedRouteId(routeCards[0].id);
+                  }}
+                  className="bg-[#1A2766] hover:bg-blue-900 text-white font-[var(--font-ui)] px-4 py-2 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  View All {routeCards.length} Available Routes
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

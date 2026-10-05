@@ -87,6 +87,8 @@ const LABEL_STYLES: Record<string, string> = {
   MOST_RELIABLE: 'bg-emerald-50 text-emerald-800 border-emerald-200',
   COMFORT_HOMESTAY: 'bg-[#5A6B3C]/15 text-[#5A6B3C] border-[#5A6B3C]/30',
   MULTIMODAL_FASTEST: 'bg-[#D4A843]/15 text-[#B88728] border-[#D4A843]/30',
+  MULTIMODAL: 'bg-[#D4A843]/15 text-[#B88728] border-[#D4A843]/30',
+  FEWEST_TRANSFERS: 'bg-purple-50 text-purple-800 border-purple-200',
   ALTERNATIVE: 'bg-brand-cream text-brand-text-muted border-stone-200',
 };
 
