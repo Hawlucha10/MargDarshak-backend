@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import StationAutocomplete from './StationAutocomplete';
+import CustomDatePicker from './CustomDatePicker';
 
 const DYNAMIC_PLACEHOLDERS = [
   'Delhi to Mumbai before 8 PM...',
@@ -41,14 +42,6 @@ export default function SearchBar() {
     setDate(d.toISOString().split('T')[0]);
   };
 
-  const setNextWeekend = () => {
-    const d = new Date();
-    const day = d.getDay(); // 0 is Sunday, 6 is Saturday
-    const daysUntilSaturday = day === 6 ? 7 : (6 - day);
-    d.setDate(d.getDate() + daysUntilSaturday);
-    setDate(d.toISOString().split('T')[0]);
-  };
-
   const handleSwap = () => {
     const tmpCode = originCode;
     const tmpDisp = originDisplay;
@@ -68,7 +61,7 @@ export default function SearchBar() {
     }
   };
 
-  // Format date preview
+  // Format date preview using Timeless font
   const getFormattedDatePreview = (isoDate: string) => {
     try {
       const [year, month, day] = isoDate.split('-').map(Number);
@@ -82,66 +75,66 @@ export default function SearchBar() {
   return (
     <form
       onSubmit={handleSearch}
-      className="bg-white/90 backdrop-blur-xl p-6 sm:p-8 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-stone-200/90 w-full transition-all"
+      className="bg-[#F6F0E6] p-5 sm:p-6 rounded-2xl sm:rounded-3xl shadow-[0_12px_36px_rgba(74,93,48,0.12)] border border-[#4A5D30]/20 w-full transition-all font-['OFLGoudyStM'] backdrop-blur-sm"
     >
-      {/* Mode Toggle: Rectangular with rounded-xl, no capsules */}
-      <div className="flex justify-center mb-6">
-        <div className="inline-flex bg-stone-100 p-1 rounded-xl border border-stone-200/70 shadow-2xs">
+      {/* Mode Toggle: Symmetrical equal width boxes (exact same size for both options) */}
+      <div className="flex justify-center mb-4">
+        <div className="inline-flex items-center bg-[#E5D5BF]/75 p-1 rounded-full border border-[#4A5D30]/20 shadow-inner w-full max-w-[340px]">
           <button
             type="button"
             onClick={() => setIsNlpMode(false)}
-            className={`px-5 py-2 rounded-lg font-[var(--font-ui)] text-xs sm:text-sm font-semibold tracking-wide transition-all ${
+            className={`flex-1 h-8 px-3 rounded-full text-xs sm:text-sm font-semibold tracking-wide transition-all cursor-pointer inline-flex items-center justify-center leading-none text-center ${
               !isNlpMode
-                ? 'bg-[#1A2766] text-white shadow-xs'
-                : 'text-stone-600 hover:text-stone-900'
+                ? 'bg-[#4A5D30] text-[#F6F0E6] shadow-sm'
+                : 'text-stone-700 hover:text-stone-950'
             }`}
           >
-            Station Search
+            <span className="translate-y-[0.5px]">Station Search</span>
           </button>
           <button
             type="button"
             onClick={() => setIsNlpMode(true)}
-            className={`px-5 py-2 rounded-lg font-[var(--font-ui)] text-xs sm:text-sm font-semibold tracking-wide transition-all ${
+            className={`flex-1 h-8 px-3 rounded-full text-xs sm:text-sm font-semibold tracking-wide transition-all cursor-pointer inline-flex items-center justify-center leading-none text-center ${
               isNlpMode
-                ? 'bg-[#1A2766] text-white shadow-xs'
-                : 'text-stone-600 hover:text-stone-900'
+                ? 'bg-[#4A5D30] text-[#F6F0E6] shadow-sm'
+                : 'text-stone-700 hover:text-stone-950'
             }`}
           >
-            Ask in Plain Language
+            <span className="translate-y-[0.5px]">Ask in Plain Language</span>
           </button>
         </div>
       </div>
 
       {isNlpMode ? (
-        <div className="mb-6 space-y-3">
+        <div className="mb-4 space-y-2">
           <div className="relative">
             <input
               type="text"
               value={nlpQuery}
               onChange={(e) => setNlpQuery(e.target.value)}
               placeholder={`Try: "${DYNAMIC_PLACEHOLDERS[placeholderIdx]}"`}
-              className="w-full bg-[#FAF8F5] border border-stone-200 rounded-2xl px-5 py-4 font-[var(--font-ui)] text-stone-900 text-base sm:text-lg outline-none focus:bg-white focus:ring-3 focus:ring-brand-blue/20 focus:border-brand-blue placeholder:text-stone-400 transition-all shadow-2xs"
+              className="w-full bg-[#FAF7F2] border border-[#4A5D30]/25 rounded-xl px-4 py-3 text-[#111111] text-sm sm:text-base outline-none focus:bg-white focus:ring-2 focus:ring-[#4A5D30]/30 focus:border-[#4A5D30] placeholder:text-stone-400 transition-all shadow-2xs"
             />
             {nlpQuery && (
               <button
                 type="button"
                 onClick={() => setNlpQuery('')}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 text-sm font-bold p-1 rounded-md"
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-[#4A5D30] text-sm font-bold p-1 cursor-pointer"
               >
                 ✕
               </button>
             )}
           </div>
-          <p className="text-xs text-stone-500 font-[var(--font-ui)] px-2">
+          <p className="text-xs text-stone-500 px-1">
             Ask naturally in English or Hinglish with timings, preferences, or intermediate bus wishes.
           </p>
         </div>
       ) : (
-        <div className="space-y-4 mb-6">
-          {/* Origin, Swap, Destination Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-[1fr,auto,1fr] gap-3 items-end">
-            <div>
-              <label className="block text-xs font-[var(--font-ui)] font-semibold text-stone-700 uppercase tracking-wider mb-1.5">
+        <div className="space-y-3.5 mb-4">
+          {/* Origin, Swap, Destination in a SINGLE COMPACT LINE */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="flex-1 min-w-0">
+              <label className="block text-xs sm:text-[13px] font-semibold text-stone-700 uppercase tracking-wider mb-1">
                 From Station or City
               </label>
               <StationAutocomplete
@@ -150,26 +143,26 @@ export default function SearchBar() {
                   setOriginCode(code);
                   setOriginDisplay(`${name} (${code})`);
                 }}
-                placeholder="Origin (e.g. NDLS, Mumbai, Pune)"
+                placeholder="Origin (e.g. NDLS, Pune)"
               />
             </div>
 
             {/* Swap Button */}
-            <div className="flex justify-center pb-1">
+            <div className="pt-5 shrink-0">
               <button
                 type="button"
                 onClick={handleSwap}
-                className="w-10 h-10 rounded-xl border border-stone-200 bg-white hover:bg-stone-50 text-stone-700 flex items-center justify-center transition-all shadow-2xs hover:border-brand-blue active:scale-95 cursor-pointer"
+                className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl border border-[#4A5D30]/25 bg-[#FAF7F2] hover:bg-[#E5D5BF] text-[#4A5D30] flex items-center justify-center transition-all shadow-2xs hover:border-[#4A5D30] active:scale-95 cursor-pointer"
                 title="Swap stations"
               >
-                <svg className="w-4 h-4 text-[#1A2766]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <svg className="w-4 h-4 text-[#4A5D30]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
                 </svg>
               </button>
             </div>
 
-            <div>
-              <label className="block text-xs font-[var(--font-ui)] font-semibold text-stone-700 uppercase tracking-wider mb-1.5">
+            <div className="flex-1 min-w-0">
+              <label className="block text-xs sm:text-[13px] font-semibold text-stone-700 uppercase tracking-wider mb-1">
                 To Station or City
               </label>
               <StationAutocomplete
@@ -178,71 +171,53 @@ export default function SearchBar() {
                   setDestCode(code);
                   setDestDisplay(`${name} (${code})`);
                 }}
-                placeholder="Destination (e.g. HWH, Chennai, Gwalior)"
+                placeholder="Destination (e.g. HWH, Gwalior)"
               />
             </div>
           </div>
 
-          {/* Date Picker & Quick Select Chips */}
-          <div className="pt-2 border-t border-stone-100">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2">
-              <label className="text-xs font-[var(--font-ui)] font-semibold text-stone-700 uppercase tracking-wider">
-                Date of Travel
-              </label>
-              {date && (
-                <span className="text-xs font-[var(--font-ui)] font-medium text-brand-blue bg-blue-50 px-2.5 py-0.5 rounded-lg border border-blue-100">
-                  {getFormattedDatePreview(date)}
-                </span>
-              )}
-            </div>
+          {/* Date Picker & Quick Select Chips with Timeless font */}
+          <div className="pt-2 border-t border-[#4A5D30]/15">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+              <div className="flex items-center gap-2">
+                <label className="text-xs sm:text-[13px] font-semibold text-stone-700 uppercase tracking-wider shrink-0 font-['OFLGoudyStM'] leading-none">
+                  Date:
+                </label>
+                <CustomDatePicker
+                  value={date}
+                  onChange={setDate}
+                  minDate={todayStr}
+                />
+                {date && (
+                  <span className="hidden sm:inline-flex h-8.5 items-center justify-center px-3 rounded-full text-[13px] sm:text-sm font-semibold text-[#4A5D30] bg-[#E5D5BF]/60 border border-[#4A5D30]/20 font-['Timeless'] leading-none">
+                    <span className="translate-y-[0.5px]">{getFormattedDatePreview(date)}</span>
+                  </span>
+                )}
+              </div>
 
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-              {/* Native Date Input with min={todayStr} */}
-              <input
-                type="date"
-                min={todayStr}
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="bg-[#FAF8F5] border border-stone-200 rounded-xl px-4 py-2.5 font-[var(--font-ui)] text-stone-800 text-sm outline-none focus:bg-white focus:ring-2 focus:ring-brand-blue/30 focus:border-brand-blue transition-all cursor-pointer"
-              />
-
-              {/* Quick Select Chips */}
-              <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
+              {/* Quick Select Chips using Timeless font & rounded-full - identical sizes */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 sm:pb-0 font-['Timeless']">
                 <button
                   type="button"
                   onClick={() => setQuickDate(0)}
-                  className={`px-3 py-2 rounded-xl text-xs font-[var(--font-ui)] font-semibold border transition-all ${
+                  className={`w-24 sm:w-26 h-8.5 rounded-full text-xs sm:text-[13.5px] font-semibold border transition-all cursor-pointer inline-flex items-center justify-center leading-none ${
                     date === todayStr
-                      ? 'bg-[#1A2766] text-white border-[#1A2766] shadow-xs'
-                      : 'bg-white border-stone-200 text-stone-700 hover:bg-stone-50'
+                      ? 'bg-[#4A5D30] text-[#F6F0E6] border-[#4A5D30] shadow-xs'
+                      : 'bg-[#FAF7F2] border-[#4A5D30]/20 text-stone-700 hover:bg-[#E5D5BF]'
                   }`}
                 >
-                  Today
+                  <span className="translate-y-[0.5px]">Today</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setQuickDate(1)}
-                  className={`px-3 py-2 rounded-xl text-xs font-[var(--font-ui)] font-semibold border transition-all ${
+                  className={`w-24 sm:w-26 h-8.5 rounded-full text-xs sm:text-[13.5px] font-semibold border transition-all cursor-pointer inline-flex items-center justify-center leading-none ${
                     date === new Date(Date.now() + 86400000).toISOString().split('T')[0]
-                      ? 'bg-[#1A2766] text-white border-[#1A2766] shadow-xs'
-                      : 'bg-white border-stone-200 text-stone-700 hover:bg-stone-50'
+                      ? 'bg-[#4A5D30] text-[#F6F0E6] border-[#4A5D30] shadow-xs'
+                      : 'bg-[#FAF7F2] border-[#4A5D30]/20 text-stone-700 hover:bg-[#E5D5BF]'
                   }`}
                 >
-                  Tomorrow
-                </button>
-                <button
-                  type="button"
-                  onClick={setNextWeekend}
-                  className="px-3 py-2 rounded-xl text-xs font-[var(--font-ui)] font-semibold border bg-white border-stone-200 text-stone-700 hover:bg-stone-50 transition-all"
-                >
-                  This Weekend
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setQuickDate(7)}
-                  className="px-3 py-2 rounded-xl text-xs font-[var(--font-ui)] font-semibold border bg-white border-stone-200 text-stone-700 hover:bg-stone-50 transition-all"
-                >
-                  +1 Week
+                  <span className="translate-y-[0.5px]">Tomorrow</span>
                 </button>
               </div>
             </div>
@@ -250,13 +225,13 @@ export default function SearchBar() {
         </div>
       )}
 
-      {/* Submit Button: No capsule, elegant rounded-2xl */}
+      {/* Submit Button in GREEN */}
       <button
         type="submit"
-        className="w-full bg-[#1A2766] hover:bg-[#121B47] text-white font-[var(--font-ui)] font-bold text-base rounded-2xl py-4 transition-all shadow-[0_4px_16px_rgba(26,39,102,0.18)] hover:shadow-[0_6px_20px_rgba(26,39,102,0.25)] hover:-translate-y-0.5 active:translate-y-0 cursor-pointer flex items-center justify-center gap-2"
+        className="w-full bg-[#4A5D30] hover:bg-[#3D4C27] text-[#F6F0E6] font-bold text-sm sm:text-base rounded-xl py-3 transition-all shadow-[0_4px_16px_rgba(74,93,48,0.20)] hover:shadow-[0_6px_20px_rgba(74,93,48,0.30)] hover:-translate-y-0.5 active:translate-y-0 cursor-pointer flex items-center justify-center gap-2"
       >
         <span>Search Optimal Routes</span>
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <svg className="w-4 h-4 text-[#F6F0E6]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
         </svg>
       </button>

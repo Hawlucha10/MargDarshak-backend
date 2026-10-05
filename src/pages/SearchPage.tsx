@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import SearchBar from '../components/SearchBar';
+import InteractiveGrid from '../components/InteractiveGrid';
 
 const HEADINGS = [
   'Where to next?',
@@ -21,36 +22,56 @@ export default function SearchPage() {
   }, []);
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center px-4 py-20 relative min-h-screen">
-      {/* Animated Heading */}
-      <div className="w-full max-w-3xl text-center mb-10">
-        <div className="h-20 md:h-28 relative overflow-hidden flex justify-center items-center">
-          <AnimatePresence mode="wait">
-            <motion.h1
-              key={headingIndex}
-              initial={{ y: 35, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: -35, opacity: 0 }}
-              transition={{ duration: 0.45, ease: 'easeOut' }}
-              className="text-4xl md:text-7xl font-[var(--font-serif)] text-brand-text font-bold tracking-tight absolute"
-            >
-              {HEADINGS[headingIndex]}
-            </motion.h1>
-          </AnimatePresence>
+    <InteractiveGrid>
+      {/* Main Content Area - Centered vertically without causing scroll */}
+      <div className="flex-1 flex flex-col items-center justify-center px-4 py-4 sm:py-6 max-w-4xl mx-auto w-full">
+        {/* Animated Headline in Galter font, text black */}
+        <div className="w-full text-center mb-6 sm:mb-8">
+          <div className="h-16 sm:h-20 md:h-24 relative overflow-hidden flex justify-center items-center">
+            <AnimatePresence mode="wait">
+              <motion.h1
+                key={headingIndex}
+                initial={{ y: 30, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: -30, opacity: 0 }}
+                transition={{ duration: 0.4, ease: 'easeOut' }}
+                className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl text-[#111111] tracking-normal absolute select-none font-normal"
+                style={{ fontFamily: "'Galter', serif" }}
+              >
+                {HEADINGS[headingIndex]}
+              </motion.h1>
+            </AnimatePresence>
+          </div>
+        </div>
+
+        {/* Short & Compact Search Card */}
+        <div className="w-full max-w-2xl relative z-10">
+          <SearchBar />
         </div>
       </div>
 
-      {/* Search Card */}
-      <div className="w-full max-w-3xl relative z-10">
-        <SearchBar />
-      </div>
+      {/* Bottom Green Stripe */}
+      <footer className="w-full bg-[#4A5D30] py-3.5 px-6 sm:px-10 flex items-center justify-between shrink-0 shadow-lg z-20">
+        {/* Logo: MargDarshak in ROSSTEN font (font-normal to prevent synthetic bolding artifacts) */}
+        <div className="flex items-center">
+          <span
+            className="text-[#F6F0E6] text-2xl sm:text-3xl tracking-wider select-none font-normal"
+            style={{ fontFamily: "'ROSSTEN', sans-serif" }}
+          >
+            MargDarshak
+          </span>
+        </div>
 
-      {/* Footer */}
-      <footer className="absolute bottom-0 w-full bg-brand-darkolive py-5 text-center">
-        <p className="font-[var(--font-serif)] text-brand-cream text-lg tracking-wide font-normal">
-          Less rush. More wonder.
-        </p>
+        {/* Slogan shifted to right side */}
+        <div className="flex items-center">
+          <p
+            className="text-[#F6F0E6]/90 text-sm sm:text-base tracking-wide font-normal select-none"
+            style={{ fontFamily: "'OFLGoudyStM', Georgia, serif" }}
+          >
+            Less rush. More wonder.
+          </p>
+        </div>
       </footer>
-    </div>
+    </InteractiveGrid>
   );
 }

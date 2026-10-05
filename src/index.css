@@ -1,47 +1,85 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@400;500;700&family=Inter:wght@400;500;600&display=swap');
 @import "tailwindcss";
 
+@font-face {
+  font-family: 'Galter';
+  src: url('/fonts/Galter.otf') format('opentype');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: block;
+}
+
+@font-face {
+  font-family: 'ROSSTEN';
+  src: url('/fonts/ROSSTEN.otf') format('opentype');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: block;
+}
+
+@font-face {
+  font-family: 'OFLGoudyStM';
+  src: url('/fonts/OFLGoudyStM.otf') format('opentype');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: block;
+}
+
+@font-face {
+  font-family: 'Timeless';
+  src: url('/fonts/TimelessMemories.otf') format('opentype');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: block;
+}
+
 @theme {
-  --color-brand-cream: #F5F0E8;
-  --color-brand-periwinkle: #C5D0F6;
-  --color-brand-blue: #3B5BDB;
-  --color-brand-olive: #5A6B3C;
-  --color-brand-white: #FFFFFF;
+  --color-brand-cream: #E5D5BF;
+  --color-brand-card: #F6F0E6;
+  --color-brand-green: #4A5D30;
+  --color-brand-green-hover: #3D4C27;
+  --color-brand-green-light: #5A6B3C;
   --color-brand-darkolive: #4A5D30;
-  --color-brand-text: #1A1A1A;
-  --color-brand-text-muted: #6B6B6B;
-  --color-brand-text-blue: #1A2766;
-  --color-brand-bus: #D4A843;
-  --color-brand-danger: #E03131;
-  --font-serif: 'DM Serif Display', serif;
-  --font-sans: 'DM Sans', sans-serif;
-  --font-ui: 'Inter', sans-serif;
-  --radius-xl: 20px;
-  --radius-pill: 999px;
-  --shadow-soft: 0 2px 12px rgba(0,0,0,0.06);
+  --color-brand-black: #111111;
+  --color-brand-text: #111111;
+
+  --font-serif: 'OFLGoudyStM', Georgia, serif;
+  --font-sans: 'OFLGoudyStM', Georgia, serif;
+  --font-ui: 'OFLGoudyStM', Georgia, serif;
+  --font-headline: 'Galter', serif;
+  --font-logo: 'ROSSTEN', sans-serif;
+  --font-goudy: 'OFLGoudyStM', Georgia, serif;
+  --font-timeless: 'Timeless', sans-serif;
+
+  --radius-xl: 18px;
+  --radius-2xl: 22px;
 }
 
 @layer base {
   body {
-    background-color: var(--color-brand-cream);
-    color: var(--color-brand-text);
-    font-family: var(--font-sans);
+    background-color: #E5D5BF;
+    color: #111111;
+    font-family: 'OFLGoudyStM', Georgia, serif;
+    font-synthesis: none;
+    -webkit-font-synthesis: none;
     margin: 0;
+    padding: 0;
+    overflow-x: hidden;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
   ::selection {
-    background: var(--color-brand-periwinkle);
-    color: var(--color-brand-text-blue);
+    background: #4A5D30;
+    color: #F6F0E6;
   }
   ::-webkit-scrollbar {
     width: 6px;
+    height: 6px;
   }
   ::-webkit-scrollbar-track {
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: var(--color-brand-olive);
+    background: #4A5D30;
     border-radius: 999px;
   }
 }
