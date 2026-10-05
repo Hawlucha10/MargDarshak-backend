@@ -124,8 +124,8 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({
   };
 
   return (
-    <div className={`fixed z-50 font-['Timeless'] ${isOpen ? 'bottom-6 right-4 sm:right-6' : 'bottom-[38px] sm:bottom-[42px] right-6 sm:right-10'}`}>
-      {/* Floating Toggle Button - Raised so it cleanly overlaps the footer strip */}
+    <div className={`fixed z-50 font-['Timeless'] ${isOpen ? 'bottom-6 right-4 sm:right-6' : 'bottom-[74px] sm:bottom-[78px] right-6 sm:right-8'}`}>
+      {/* Floating Toggle Button - Shifted upwards completely above the footer strip */}
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}

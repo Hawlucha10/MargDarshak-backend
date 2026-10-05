@@ -144,7 +144,7 @@ export default function CustomDatePicker({ value, onChange, minDate, disabled = 
         type="button"
         disabled={disabled}
         onClick={() => !disabled && setIsOpen(!isOpen)}
-        className="h-11 sm:h-12 inline-flex items-center justify-center gap-2.5 bg-[#FAF7F2] border border-[#4A5D30]/25 hover:border-[#4A5D30] rounded-full px-4 text-[19px] sm:text-[20px] font-['Timeless'] text-[#111111] transition-all shadow-2xs hover:bg-[#F3ECE0] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+        className="h-9 sm:h-9.5 inline-flex items-center justify-center gap-2 bg-[#FAF7F2] border border-[#4A5D30]/25 hover:border-[#4A5D30] rounded-full px-3.5 text-[15px] sm:text-[16px] font-['Timeless'] text-[#111111] transition-all shadow-2xs hover:bg-[#F3ECE0] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
       >
         <span className="font-semibold tracking-wide leading-none translate-y-[0.5px]">
           {formatDisplay(value)}
@@ -166,17 +166,17 @@ export default function CustomDatePicker({ value, onChange, minDate, disabled = 
 
       {/* Popover Calendar - Always opens UPWARDS so it never overlaps the bottom stripe */}
       {isOpen && (
-        <div className="absolute z-[100] bottom-full mb-2.5 left-0 w-80 bg-[#F6F0E6] border border-[#4A5D30]/25 rounded-2xl shadow-2xl p-4 font-['Timeless'] animate-in fade-in zoom-in-95 duration-150">
+        <div className="absolute z-[100] bottom-full mb-2.5 left-0 w-72 bg-[#F6F0E6] border border-[#4A5D30]/25 rounded-2xl shadow-2xl p-3.5 font-['Timeless'] animate-in fade-in zoom-in-95 duration-150">
           {/* Header */}
-          <div className="flex items-center justify-between mb-3 pb-2 border-b border-[#4A5D30]/15">
-            <span className="font-bold text-[19px] text-[#111111] tracking-wide">
+          <div className="flex items-center justify-between mb-2.5 pb-2 border-b border-[#4A5D30]/15">
+            <span className="font-bold text-[16px] text-[#111111] tracking-wide">
               {monthNames[viewMonth]}, {viewYear}
             </span>
             <div className="flex items-center gap-1">
               <button
                 type="button"
                 onClick={handlePrevMonth}
-                className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-[#E5D5BF] text-[#4A5D30] transition-colors cursor-pointer text-base font-bold"
+                className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-[#E5D5BF] text-[#4A5D30] transition-colors cursor-pointer text-sm font-bold"
                 title="Previous month"
               >
                 ←
@@ -184,7 +184,7 @@ export default function CustomDatePicker({ value, onChange, minDate, disabled = 
               <button
                 type="button"
                 onClick={handleNextMonth}
-                className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-[#E5D5BF] text-[#4A5D30] transition-colors cursor-pointer text-base font-bold"
+                className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-[#E5D5BF] text-[#4A5D30] transition-colors cursor-pointer text-sm font-bold"
                 title="Next month"
               >
                 →
@@ -193,7 +193,7 @@ export default function CustomDatePicker({ value, onChange, minDate, disabled = 
           </div>
 
           {/* Weekday Labels */}
-          <div className="grid grid-cols-7 gap-1 text-center mb-1 text-[16px] sm:text-[17px] font-semibold text-[#4A5D30]/80">
+          <div className="grid grid-cols-7 gap-1 text-center mb-1 text-[13px] sm:text-[14px] font-semibold text-[#4A5D30]/80">
             <span>Su</span>
             <span>Mo</span>
             <span>Tu</span>
@@ -204,7 +204,7 @@ export default function CustomDatePicker({ value, onChange, minDate, disabled = 
           </div>
 
           {/* Days Grid */}
-          <div className="grid grid-cols-7 gap-1 text-center text-[16px] sm:text-[17px]">
+          <div className="grid grid-cols-7 gap-1 text-center text-[13px] sm:text-[14px]">
             {calendarDays.map((cell, idx) => {
               const selected = isSelected(cell.day, cell.month, cell.year);
               const past = isPast(cell.day, cell.month, cell.year);
@@ -215,14 +215,14 @@ export default function CustomDatePicker({ value, onChange, minDate, disabled = 
                   type="button"
                   disabled={past}
                   onClick={() => handleDaySelect(cell.day, cell.month, cell.year)}
-                  className={`h-8 w-8 sm:h-9 sm:w-9 mx-auto flex items-center justify-center text-[16px] sm:text-[17px] transition-all ${
+                  className={`h-7 w-7 sm:h-8 sm:w-8 mx-auto flex items-center justify-center text-[13px] sm:text-[14px] transition-all ${
                     selected
-                      ? 'bg-[#4A5D30] text-[#F6F0E6] font-bold rounded-xl shadow-xs'
+                      ? 'bg-[#4A5D30] text-[#F6F0E6] font-bold rounded-lg shadow-xs'
                       : past
                       ? 'text-stone-300 cursor-not-allowed'
                       : cell.isCurrentMonth
-                      ? 'text-[#111111] hover:bg-[#E5D5BF] rounded-xl cursor-pointer'
-                      : 'text-stone-400 hover:bg-[#E5D5BF]/50 rounded-xl cursor-pointer'
+                      ? 'text-[#111111] hover:bg-[#E5D5BF] rounded-lg cursor-pointer'
+                      : 'text-stone-400 hover:bg-[#E5D5BF]/50 rounded-lg cursor-pointer'
                   }`}
                 >
                   {cell.day}
@@ -232,7 +232,7 @@ export default function CustomDatePicker({ value, onChange, minDate, disabled = 
           </div>
 
           {/* Footer Actions */}
-          <div className="flex items-center justify-between mt-3 pt-2 border-t border-[#4A5D30]/15 text-[16px] sm:text-[17px] font-semibold">
+          <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-[#4A5D30]/15 text-[13px] sm:text-[14px] font-semibold">
             <button
               type="button"
               onClick={() => { onChange(''); setIsOpen(false); }}

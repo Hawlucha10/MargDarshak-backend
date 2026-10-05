@@ -145,7 +145,7 @@ export default function StationAutocomplete({ value, onChange, placeholder, disa
         onBlur={handleBlur}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
-        className="w-full bg-[#FAF7F2] border border-[#4A5D30]/25 rounded-xl px-4 py-2.5 font-['Timeless'] text-[#111111] text-[19px] sm:text-[20px] outline-none focus:bg-white focus:ring-2 focus:ring-[#4A5D30]/30 focus:border-[#4A5D30] placeholder:text-stone-400 transition-all shadow-2xs disabled:opacity-60 disabled:cursor-not-allowed"
+        className="w-full bg-[#FAF7F2] border border-[#4A5D30]/25 rounded-xl px-4 py-2 font-['Timeless'] text-[#111111] text-[16px] sm:text-[17px] outline-none focus:bg-white focus:ring-2 focus:ring-[#4A5D30]/30 focus:border-[#4A5D30] placeholder:text-stone-400 transition-all shadow-2xs disabled:opacity-60 disabled:cursor-not-allowed"
       />
       {isOpen && suggestions.length > 0 && (
         <div
@@ -160,7 +160,7 @@ export default function StationAutocomplete({ value, onChange, placeholder, disa
                 type="button"
                 onMouseEnter={() => setActiveIndex(idx)}
                 onClick={() => handleSelect(s)}
-                className={`w-full text-left px-4 py-3 transition-colors text-[18px] sm:text-[19px] border-b border-[#4A5D30]/10 last:border-b-0 cursor-pointer flex items-center justify-between ${
+                className={`w-full text-left px-4 py-2.5 transition-colors text-[15px] sm:text-[16px] border-b border-[#4A5D30]/10 last:border-b-0 cursor-pointer flex items-center justify-between ${
                   isHighlighted ? 'bg-[#E5D5BF] font-semibold' : 'hover:bg-[#E5D5BF]/60'
                 }`}
               >
@@ -170,9 +170,9 @@ export default function StationAutocomplete({ value, onChange, placeholder, disa
                     <circle cx="12" cy="9" r="2.5" />
                   </svg>
                   <span className="font-semibold text-[#111111]">{s.name}</span>
-                  {s.state && <span className="text-stone-500 ml-1 text-[16px] sm:text-[17px] font-normal">· {s.state}</span>}
+                  {s.state && <span className="text-stone-500 ml-1 text-[13px] sm:text-[14px] font-normal">· {s.state}</span>}
                 </div>
-                <span className="text-[#4A5D30] font-bold text-[17px] sm:text-[18px] shrink-0 ml-2">({s.code})</span>
+                <span className="text-[#4A5D30] font-bold text-[14px] sm:text-[15px] shrink-0 ml-2">({s.code})</span>
               </button>
             );
           })}

@@ -125,18 +125,18 @@ export default function SearchBar() {
   return (
     <form
       onSubmit={handleSearch}
-      className="bg-[#F6F0E6] p-6 sm:p-7 rounded-2xl sm:rounded-3xl shadow-[0_12px_36px_rgba(74,93,48,0.12)] border border-[#4A5D30]/20 w-full transition-all font-['OFLGoudyStM'] backdrop-blur-sm"
+      className="bg-[#F6F0E6] p-5 sm:p-6 rounded-2xl sm:rounded-3xl shadow-[0_12px_36px_rgba(74,93,48,0.12)] border border-[#4A5D30]/20 w-full transition-all font-['OFLGoudyStM'] backdrop-blur-sm"
     >
       {/* Mode Toggle: Symmetrical equal width boxes (exact same size for both options) */}
-      <div className="flex justify-center mb-5">
-        <div className="inline-flex items-center bg-[#E5D5BF]/75 p-1 rounded-full border border-[#4A5D30]/20 shadow-inner w-full max-w-[440px]">
+      <div className="flex justify-center mb-4">
+        <div className="inline-flex items-center bg-[#E5D5BF]/75 p-1 rounded-full border border-[#4A5D30]/20 shadow-inner w-full max-w-[370px]">
           <button
             type="button"
             onClick={() => {
               setIsNlpMode(false);
               setErrorMsg('');
             }}
-            className={`flex-1 h-10 sm:h-11 px-3 sm:px-4 rounded-full text-[17px] sm:text-[19px] font-semibold tracking-wide transition-all cursor-pointer inline-flex items-center justify-center leading-none text-center ${
+            className={`flex-1 h-9 sm:h-9.5 px-3 rounded-full text-[14px] sm:text-[16px] font-semibold tracking-wide transition-all cursor-pointer inline-flex items-center justify-center leading-none text-center ${
               !isNlpMode
                 ? 'bg-[#4A5D30] text-[#F6F0E6] shadow-sm'
                 : 'text-stone-700 hover:text-stone-950'
@@ -150,7 +150,7 @@ export default function SearchBar() {
               setIsNlpMode(true);
               setErrorMsg('');
             }}
-            className={`flex-1 h-10 sm:h-11 px-3 sm:px-4 rounded-full text-[17px] sm:text-[19px] font-semibold tracking-wide transition-all cursor-pointer inline-flex items-center justify-center leading-none text-center ${
+            className={`flex-1 h-9 sm:h-9.5 px-3 rounded-full text-[14px] sm:text-[16px] font-semibold tracking-wide transition-all cursor-pointer inline-flex items-center justify-center leading-none text-center ${
               isNlpMode
                 ? 'bg-[#4A5D30] text-[#F6F0E6] shadow-sm'
                 : 'text-stone-700 hover:text-stone-950'
@@ -162,10 +162,10 @@ export default function SearchBar() {
       </div>
 
       {/* Content Panels: Superposed in CSS Grid so the whole box keeps the exact same size */}
-      <div className="grid grid-cols-1 grid-rows-1 mb-5">
+      <div className="grid grid-cols-1 grid-rows-1 mb-4">
         {/* Panel 1: Station Search */}
         <div
-          className={`col-start-1 row-start-1 space-y-4 transition-opacity duration-150 ${
+          className={`col-start-1 row-start-1 space-y-3.5 transition-opacity duration-150 ${
             !isNlpMode
               ? 'opacity-100 relative z-10'
               : 'opacity-0 pointer-events-none invisible select-none'
@@ -175,7 +175,7 @@ export default function SearchBar() {
           {/* Origin, Swap, Destination in a SINGLE COMPACT LINE */}
           <div className="flex items-center gap-2 sm:gap-3">
             <div className="flex-1 min-w-0">
-              <label className="block text-[17px] sm:text-[18px] font-semibold text-stone-700 uppercase tracking-wider mb-1.5 font-['OFLGoudyStM']">
+              <label className="block text-[14px] sm:text-[15px] font-semibold text-stone-700 uppercase tracking-wider mb-1 font-['OFLGoudyStM']">
                 From Station or City
               </label>
               <StationAutocomplete
@@ -190,22 +190,22 @@ export default function SearchBar() {
             </div>
 
             {/* Swap Button */}
-            <div className="pt-7 shrink-0">
+            <div className="pt-5 sm:pt-6 shrink-0">
               <button
                 type="button"
                 disabled={isNlpMode}
                 onClick={handleSwap}
-                className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl border border-[#4A5D30]/25 bg-[#FAF7F2] hover:bg-[#E5D5BF] text-[#4A5D30] flex items-center justify-center transition-all shadow-2xs hover:border-[#4A5D30] active:scale-95 cursor-pointer disabled:opacity-50"
+                className="w-10 h-10 sm:w-10.5 sm:h-10.5 rounded-xl border border-[#4A5D30]/25 bg-[#FAF7F2] hover:bg-[#E5D5BF] text-[#4A5D30] flex items-center justify-center transition-all shadow-2xs hover:border-[#4A5D30] active:scale-95 cursor-pointer disabled:opacity-50"
                 title="Swap stations"
               >
-                <svg className="w-5 h-5 text-[#4A5D30]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <svg className="w-4 h-4 text-[#4A5D30]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
                 </svg>
               </button>
             </div>
 
             <div className="flex-1 min-w-0">
-              <label className="block text-[17px] sm:text-[18px] font-semibold text-stone-700 uppercase tracking-wider mb-1.5 font-['OFLGoudyStM']">
+              <label className="block text-[14px] sm:text-[15px] font-semibold text-stone-700 uppercase tracking-wider mb-1 font-['OFLGoudyStM']">
                 To Station or City
               </label>
               <StationAutocomplete
@@ -221,10 +221,10 @@ export default function SearchBar() {
           </div>
 
           {/* Date Picker & Quick Select Chips with Timeless font */}
-          <div className="pt-3 border-t border-[#4A5D30]/15">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5">
-                <label className="text-[17px] sm:text-[18px] font-semibold text-stone-700 uppercase tracking-wider shrink-0 font-['OFLGoudyStM'] leading-none">
+          <div className="pt-2.5 border-t border-[#4A5D30]/15">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+              <div className="flex items-center gap-2">
+                <label className="text-[14px] sm:text-[15px] font-semibold text-stone-700 uppercase tracking-wider shrink-0 font-['OFLGoudyStM'] leading-none">
                   Date:
                 </label>
                 <CustomDatePicker
@@ -234,19 +234,19 @@ export default function SearchBar() {
                   disabled={isNlpMode}
                 />
                 {date && (
-                  <span className="hidden sm:inline-flex h-11 sm:h-12 items-center justify-center px-4 rounded-full text-[18px] sm:text-[19px] font-semibold text-[#4A5D30] bg-[#E5D5BF]/60 border border-[#4A5D30]/20 font-['Timeless'] leading-none">
+                  <span className="hidden sm:inline-flex h-9 sm:h-9.5 items-center justify-center px-3 rounded-full text-[15px] sm:text-[16px] font-semibold text-[#4A5D30] bg-[#E5D5BF]/60 border border-[#4A5D30]/20 font-['Timeless'] leading-none">
                     <span className="translate-y-[0.5px]">{getFormattedDatePreview(date)}</span>
                   </span>
                 )}
               </div>
 
               {/* Quick Select Chips using Timeless font & rounded-full */}
-              <div className="flex items-center gap-2 overflow-x-auto pb-0.5 sm:pb-0 font-['Timeless']">
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 sm:pb-0 font-['Timeless']">
                 <button
                   type="button"
                   disabled={isNlpMode}
                   onClick={() => setQuickDate(0)}
-                  className={`w-28 sm:w-32 h-11 sm:h-12 rounded-full text-[17px] sm:text-[18.5px] font-semibold border transition-all cursor-pointer inline-flex items-center justify-center leading-none ${
+                  className={`w-24 sm:w-26 h-9 sm:h-9.5 rounded-full text-[14px] sm:text-[15.5px] font-semibold border transition-all cursor-pointer inline-flex items-center justify-center leading-none ${
                     date === todayStr
                       ? 'bg-[#4A5D30] text-[#F6F0E6] border-[#4A5D30] shadow-xs'
                       : 'bg-[#FAF7F2] border-[#4A5D30]/20 text-stone-700 hover:bg-[#E5D5BF]'
@@ -258,7 +258,7 @@ export default function SearchBar() {
                   type="button"
                   disabled={isNlpMode}
                   onClick={() => setQuickDate(1)}
-                  className={`w-28 sm:w-32 h-11 sm:h-12 rounded-full text-[17px] sm:text-[18.5px] font-semibold border transition-all cursor-pointer inline-flex items-center justify-center leading-none ${
+                  className={`w-24 sm:w-26 h-9 sm:h-9.5 rounded-full text-[14px] sm:text-[15.5px] font-semibold border transition-all cursor-pointer inline-flex items-center justify-center leading-none ${
                     date === new Date(Date.now() + 86400000).toISOString().split('T')[0]
                       ? 'bg-[#4A5D30] text-[#F6F0E6] border-[#4A5D30] shadow-xs'
                       : 'bg-[#FAF7F2] border-[#4A5D30]/20 text-stone-700 hover:bg-[#E5D5BF]'
@@ -273,17 +273,17 @@ export default function SearchBar() {
 
         {/* Panel 2: Ask in Plain Language */}
         <div
-          className={`col-start-1 row-start-1 space-y-4 transition-opacity duration-150 ${
+          className={`col-start-1 row-start-1 space-y-3.5 transition-opacity duration-150 ${
             isNlpMode
               ? 'opacity-100 relative z-10'
               : 'opacity-0 pointer-events-none invisible select-none'
           }`}
           aria-hidden={!isNlpMode}
         >
-          {/* Query Input with Matching Label Height (Groq AI badge removed) */}
+          {/* Query Input with Matching Label Height */}
           <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="block text-[17px] sm:text-[18px] font-semibold text-stone-700 uppercase tracking-wider font-['OFLGoudyStM']">
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-[14px] sm:text-[15px] font-semibold text-stone-700 uppercase tracking-wider font-['OFLGoudyStM']">
                 Ask in Plain Language (Hindi, Hinglish, English)
               </label>
             </div>
@@ -294,13 +294,13 @@ export default function SearchBar() {
                 onChange={(e) => setNlpQuery(e.target.value)}
                 disabled={!isNlpMode}
                 placeholder={`Try: "${DYNAMIC_PLACEHOLDERS[placeholderIdx]}"`}
-                className="w-full bg-[#FAF7F2] border border-[#4A5D30]/25 rounded-xl px-4 py-3 font-['Timeless'] text-[#111111] text-[19px] sm:text-[20px] outline-none focus:bg-white focus:ring-2 focus:ring-[#4A5D30]/30 focus:border-[#4A5D30] placeholder:text-stone-400 transition-all shadow-2xs"
+                className="w-full bg-[#FAF7F2] border border-[#4A5D30]/25 rounded-xl px-3.5 py-2.5 font-['Timeless'] text-[#111111] text-[16px] sm:text-[17px] outline-none focus:bg-white focus:ring-2 focus:ring-[#4A5D30]/30 focus:border-[#4A5D30] placeholder:text-stone-400 transition-all shadow-2xs"
               />
               {nlpQuery && (
                 <button
                   type="button"
                   onClick={() => setNlpQuery('')}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-[#4A5D30] text-base font-bold p-1 cursor-pointer"
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-[#4A5D30] text-sm font-bold p-1 cursor-pointer"
                   title="Clear query"
                 >
                   ✕
@@ -310,18 +310,18 @@ export default function SearchBar() {
           </div>
 
           {/* Quick Example Chips with Identical Height to Date Row */}
-          <div className="pt-3 border-t border-[#4A5D30]/15">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-2 overflow-x-auto pb-0.5 sm:pb-0">
-                <span className="text-[17px] sm:text-[18px] font-semibold text-stone-700 uppercase tracking-wider shrink-0 font-['OFLGoudyStM'] leading-none">
+          <div className="pt-2.5 border-t border-[#4A5D30]/15">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 sm:pb-0">
+                <span className="text-[14px] sm:text-[15px] font-semibold text-stone-700 uppercase tracking-wider shrink-0 font-['OFLGoudyStM'] leading-none">
                   Try:
                 </span>
-                <div className="flex items-center gap-2 font-['Timeless']">
+                <div className="flex items-center gap-1.5 font-['Timeless']">
                   <button
                     type="button"
                     disabled={!isNlpMode}
                     onClick={() => setNlpQuery('Pune se Gwalior agle hafte subah')}
-                    className="h-11 sm:h-12 px-4 rounded-full text-[17px] sm:text-[18px] font-semibold border bg-[#FAF7F2] border-[#4A5D30]/20 text-stone-700 hover:bg-[#E5D5BF] transition-all cursor-pointer inline-flex items-center justify-center leading-none active:scale-95"
+                    className="h-9 sm:h-9.5 px-3 rounded-full text-[14px] sm:text-[15px] font-semibold border bg-[#FAF7F2] border-[#4A5D30]/20 text-stone-700 hover:bg-[#E5D5BF] transition-all cursor-pointer inline-flex items-center justify-center leading-none active:scale-95"
                   >
                     <span className="translate-y-[0.5px]">Pune → Gwalior</span>
                   </button>
@@ -329,7 +329,7 @@ export default function SearchBar() {
                     type="button"
                     disabled={!isNlpMode}
                     onClick={() => setNlpQuery('Delhi to Mumbai before 8 PM')}
-                    className="h-11 sm:h-12 px-4 rounded-full text-[17px] sm:text-[18px] font-semibold border bg-[#FAF7F2] border-[#4A5D30]/20 text-stone-700 hover:bg-[#E5D5BF] transition-all cursor-pointer inline-flex items-center justify-center leading-none active:scale-95"
+                    className="h-9 sm:h-9.5 px-3 rounded-full text-[14px] sm:text-[15px] font-semibold border bg-[#FAF7F2] border-[#4A5D30]/20 text-stone-700 hover:bg-[#E5D5BF] transition-all cursor-pointer inline-flex items-center justify-center leading-none active:scale-95"
                   >
                     <span className="translate-y-[0.5px]">Delhi → Mumbai</span>
                   </button>
@@ -337,15 +337,15 @@ export default function SearchBar() {
                     type="button"
                     disabled={!isNlpMode}
                     onClick={() => setNlpQuery('Kanpur se Lucknow sabse sasta')}
-                    className="hidden md:inline-flex h-11 sm:h-12 px-4 rounded-full text-[17px] sm:text-[18px] font-semibold border bg-[#FAF7F2] border-[#4A5D30]/20 text-stone-700 hover:bg-[#E5D5BF] transition-all cursor-pointer items-center justify-center leading-none active:scale-95"
+                    className="hidden md:inline-flex h-9 sm:h-9.5 px-3 rounded-full text-[14px] sm:text-[15px] font-semibold border bg-[#FAF7F2] border-[#4A5D30]/20 text-stone-700 hover:bg-[#E5D5BF] transition-all cursor-pointer items-center justify-center leading-none active:scale-95"
                   >
                     <span className="translate-y-[0.5px]">Kanpur → Lucknow</span>
                   </button>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 shrink-0 font-['Timeless']">
-                <span className="h-11 sm:h-12 inline-flex items-center justify-center px-4 rounded-full text-[17px] sm:text-[18px] font-semibold text-[#4A5D30] bg-[#E5D5BF]/60 border border-[#4A5D30]/20 leading-none">
+              <div className="flex items-center gap-1.5 shrink-0 font-['Timeless']">
+                <span className="h-9 sm:h-9.5 inline-flex items-center justify-center px-3 rounded-full text-[14px] sm:text-[15px] font-semibold text-[#4A5D30] bg-[#E5D5BF]/60 border border-[#4A5D30]/20 leading-none">
                   <span className="translate-y-[0.5px]">Bus & Train Aware</span>
                 </span>
               </div>
@@ -356,7 +356,7 @@ export default function SearchBar() {
 
       {/* Error feedback if fields are incomplete */}
       {errorMsg && (
-        <div className="mb-4 px-5 py-2.5 rounded-xl bg-[#E5D5BF]/80 border border-[#4A5D30]/30 text-[#4A5D30] font-semibold text-[17px] sm:text-[19px] text-center">
+        <div className="mb-3 px-4 py-2 rounded-xl bg-[#E5D5BF]/80 border border-[#4A5D30]/30 text-[#4A5D30] font-semibold text-[14px] sm:text-[16px] text-center">
           {errorMsg}
         </div>
       )}
@@ -364,10 +364,10 @@ export default function SearchBar() {
       {/* Submit Button in GREEN */}
       <button
         type="submit"
-        className="w-full bg-[#4A5D30] hover:bg-[#3D4C27] text-[#F6F0E6] font-bold text-[19px] sm:text-[21px] rounded-xl py-3.5 sm:py-4 transition-all shadow-[0_4px_16px_rgba(74,93,48,0.20)] hover:shadow-[0_6px_20px_rgba(74,93,48,0.30)] hover:-translate-y-0.5 active:translate-y-0 cursor-pointer flex items-center justify-center gap-2.5"
+        className="w-full bg-[#4A5D30] hover:bg-[#3D4C27] text-[#F6F0E6] font-bold text-[16px] sm:text-[18px] rounded-xl py-3 sm:py-3.5 transition-all shadow-[0_4px_16px_rgba(74,93,48,0.20)] hover:shadow-[0_6px_20px_rgba(74,93,48,0.30)] hover:-translate-y-0.5 active:translate-y-0 cursor-pointer flex items-center justify-center gap-2"
       >
         <span>Search Optimal Routes</span>
-        <svg className="w-5 h-5 text-[#F6F0E6]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <svg className="w-4.5 h-4.5 text-[#F6F0E6]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
         </svg>
       </button>

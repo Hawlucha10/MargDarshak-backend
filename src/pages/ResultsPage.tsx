@@ -250,18 +250,18 @@ export default function ResultsPage() {
 
   return (
     <div className="h-screen w-screen flex flex-col overflow-hidden bg-[#E5D5BF] font-['Timeless']">
-      {/* Main Content Area: 45% Map / 55% Details Split */}
+      {/* Main Content Area: 40% Map / 60% Details Split */}
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
-        {/* Map Area: 45% Width on desktop */}
-        <div className="w-full md:w-[45%] h-[40vh] md:h-full relative z-0 flex-shrink-0 border-r border-[#4A5D30]/20">
+        {/* Map Area: 40% Width on desktop */}
+        <div className="w-full md:w-[40%] h-[40vh] md:h-full relative z-0 flex-shrink-0 border-r border-[#4A5D30]/20">
           <RouteMap
             legs={activeRoute?.legs}
             busLegs={activeRoute?.bus_legs}
           />
         </div>
 
-        {/* Route & NLP Response Area: 55% Width on desktop */}
-        <div className="w-full md:w-[55%] h-[60vh] md:h-full overflow-y-auto bg-[#E5D5BF] p-5 sm:p-7 md:p-8 flex flex-col shadow-inner font-['Timeless']">
+        {/* Route & NLP Response Area: 60% Width on desktop */}
+        <div className="w-full md:w-[60%] h-[60vh] md:h-full overflow-y-auto bg-[#E5D5BF] p-5 sm:p-7 md:p-8 flex flex-col shadow-inner font-['Timeless']">
           {/* Header with Title and Query Metrics */}
           <div className="mb-4 pt-1 font-['Timeless']">
             <div className="flex items-center justify-between">
@@ -484,17 +484,17 @@ export default function ResultsPage() {
         <div className="flex items-center">
           <Link
             to="/"
-            className="text-[#4A5D30] text-[29px] sm:text-[35px] tracking-wider select-none font-normal hover:opacity-85 transition-opacity"
+            className="text-[#4A5D30] text-[26px] sm:text-[32px] tracking-wider select-none font-normal hover:opacity-85 transition-opacity"
             style={{ fontFamily: "'ROSSTEN', sans-serif" }}
           >
             MargDarshak
           </Link>
         </div>
 
-        {/* Slogan shifted to right side with clearance for overlapping AI button */}
-        <div className="flex items-center pr-36 sm:pr-44">
+        {/* Slogan naturally positioned at bottom right */}
+        <div className="flex items-center">
           <p
-            className="text-[#4A5D30]/90 text-[19px] sm:text-[21px] tracking-wide font-normal select-none"
+            className="text-[#4A5D30]/90 text-[16px] sm:text-[18px] tracking-wide font-normal select-none"
             style={{ fontFamily: "'OFLGoudyStM', Georgia, serif" }}
           >
             Less rush. More wonder.
