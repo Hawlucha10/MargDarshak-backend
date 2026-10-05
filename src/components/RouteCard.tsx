@@ -168,7 +168,9 @@ export default function RouteCard({ route, index, isActive, onSelect }: RoutePro
           {route.isComfortable && <ComfortBadge />}
           {route.transfers !== undefined && (
             <span className="text-xs font-ui bg-stone-100 text-stone-700 px-2.5 py-1 rounded-md border border-stone-200/60 font-medium">
-              {route.transfers === 0 ? 'Direct Train' : `${route.transfers} Transfer`}
+              {route.transfers === 0
+                ? (route.hasBusLeg && (!route.legs || route.legs.length === 0) ? 'Direct Highway Bus' : 'Direct Train')
+                : `${route.transfers} ${route.hasBusLeg ? 'Intermodal Transfer' : 'Transfer'}${route.transfers > 1 ? 's' : ''}`}
             </span>
           )}
           {route.reliability && (
@@ -267,7 +269,7 @@ export default function RouteCard({ route, index, isActive, onSelect }: RoutePro
           {route.bus_legs && route.bus_legs.length > 0 && (
             <div className="flex flex-col gap-2">
               <h4 className="font-serif text-sm font-bold text-amber-800 tracking-wide uppercase">
-                Connecting Bus Alternative
+                {route.legs && route.legs.length > 0 ? 'Connecting Bus Segment' : 'Highway Express Bus Journey'}
               </h4>
               {route.bus_legs.map((b, bIdx) => (
                 <div key={bIdx} className="bg-amber-50/80 p-3.5 rounded-xl border border-amber-200 text-amber-950">

@@ -6,6 +6,7 @@ import {
   ChevronUp, 
   ArrowRight, 
   Train, 
+  Bus,
   AlertTriangle, 
   ArrowDownUp,
   Tag
@@ -31,8 +32,26 @@ export const RouteTile: React.FC<RouteTileProps> = ({
 }) => {
   const [isExpanded, setIsExpanded] = useState(index === 0); // Expand top route by default
 
-  const firstLeg = route.legs[0];
-  const lastLeg = route.legs[route.legs.length - 1];
+  const hasTrains = Boolean(route.legs && route.legs.length > 0);
+  const hasBuses = Boolean(route.bus_legs && route.bus_legs.length > 0);
+
+  const firstLeg = hasTrains ? route.legs[0] : null;
+  const lastLeg = hasTrains ? route.legs[route.legs.length - 1] : null;
+
+  const firstBus = hasBuses ? route.bus_legs[0] : null;
+  const lastBus = hasBuses ? route.bus_legs[route.bus_legs.length - 1] : null;
+
+  // Origin info: prefer train if train leg exists first, else bus
+  const depTime = (firstLeg?.departure_time || firstBus?.departure_time || '08:00').slice(0, 5);
+  const depStation = firstLeg?.from_station_name || firstLeg?.from_station || firstBus?.from_terminal || 'Origin';
+  const depStationCode = firstLeg?.from_station || firstBus?.from_station_code || '';
+  const depPlatform = firstLeg?.departure_platform || (firstBus ? 'Bus Bay' : 'PF 1');
+
+  // Destination info: prefer last bus if multimodal arrives by bus, else last train
+  const arrTime = (lastBus && (!lastLeg || route.is_multimodal) ? lastBus.arrival_time : (lastLeg?.arrival_time || '18:00')).slice(0, 5);
+  const arrStation = (lastBus && (!lastLeg || route.is_multimodal) ? lastBus.to_terminal : (lastLeg?.to_station_name || lastLeg?.to_station || 'Destination'));
+  const arrStationCode = (lastBus && (!lastLeg || route.is_multimodal) ? lastBus.to_station_code : (lastLeg?.to_station || ''));
+  const arrPlatform = (lastBus && (!lastLeg || route.is_multimodal) ? 'Bus Terminal' : (lastLeg?.arrival_platform || 'PF 2'));
 
   // Starting base fares approximation for preview
   const slFare = route.total_fare || 750;
@@ -98,17 +117,17 @@ export const RouteTile: React.FC<RouteTileProps> = ({
           <div>
             <div className="flex items-center space-x-2">
               <span className="text-2xl font-black font-mono tracking-tight text-[#0F172A]">
-                {firstLeg.departure_time?.slice(0, 5) || '08:00'}
+                {depTime}
               </span>
               <span className="text-xs font-mono font-bold bg-[#0F172A] text-white px-2 py-0.5">
-                {firstLeg.departure_platform || 'PF 1'}
+                {depPlatform}
               </span>
             </div>
             <div className="text-sm font-extrabold text-[#0F172A] uppercase mt-0.5">
-              {firstLeg.from_station_name || firstLeg.from_station}
+              {depStation}
             </div>
             <div className="text-xs font-mono text-[#64748B]">
-              Origin ({firstLeg.from_station})
+              Origin ({depStationCode})
             </div>
           </div>
 
@@ -127,11 +146,11 @@ export const RouteTile: React.FC<RouteTileProps> = ({
               {/* Intermediate Transfer Marker */}
               {route.transfers > 0 ? (
                 <span className="bg-[#D97706] text-white text-[10px] font-mono font-bold px-1.5 py-0.2 border border-[#0F172A]">
-                  {route.transfers} TRANSFER{route.transfers > 1 ? 'S' : ''}
+                  {route.transfers} {route.is_multimodal ? 'INTERMODAL' : 'TRANSFER'}{route.transfers > 1 ? 'S' : ''}
                 </span>
               ) : (
                 <span className="bg-[#15803D] text-white text-[10px] font-mono font-bold px-1.5 py-0.2 border border-[#0F172A]">
-                  DIRECT TRIP
+                  {route.is_multimodal ? 'DIRECT BUS' : 'DIRECT TRIP'}
                 </span>
               )}
             </div>
@@ -139,10 +158,10 @@ export const RouteTile: React.FC<RouteTileProps> = ({
             <div className="text-[11px] font-mono text-[#64748B] text-center">
               {route.transfers > 0 ? (
                 <span>
-                  Via {route.legs.slice(0, -1).map(l => l.to_station).join(', ')} ({route.transfers_info[0]?.wait_time_minutes || 45}m layover)
+                  Via {route.transfers_info?.map(t => t.station_code).join(', ') || (route.legs.slice(0, -1).map(l => l.to_station).join(', '))} ({route.transfers_info[0]?.wait_time_minutes || 45}m layover)
                 </span>
               ) : (
-                <span>Zero Train Changes</span>
+                <span>{route.is_multimodal ? 'Direct Highway Express' : 'Zero Train Changes'}</span>
               )}
             </div>
           </div>
@@ -151,17 +170,17 @@ export const RouteTile: React.FC<RouteTileProps> = ({
           <div className="md:text-right">
             <div className="flex items-center md:justify-end space-x-2">
               <span className="text-xs font-mono font-bold bg-[#0F172A] text-white px-2 py-0.5">
-                {lastLeg.arrival_platform || 'PF 2'}
+                {arrPlatform}
               </span>
               <span className="text-2xl font-black font-mono tracking-tight text-[#0F172A]">
-                {lastLeg.arrival_time?.slice(0, 5) || '18:00'}
+                {arrTime}
               </span>
             </div>
             <div className="text-sm font-extrabold text-[#0F172A] uppercase mt-0.5">
-              {lastLeg.to_station_name || lastLeg.to_station}
+              {arrStation}
             </div>
             <div className="text-xs font-mono text-[#64748B]">
-              Destination ({lastLeg.to_station})
+              Destination ({arrStationCode})
             </div>
           </div>
 
@@ -201,7 +220,8 @@ export const RouteTile: React.FC<RouteTileProps> = ({
 
           {/* LEGS ITERATION */}
           <div className="space-y-4">
-            {route.legs.map((leg, lIdx) => {
+            {/* TRAIN LEGS */}
+            {route.legs?.map((leg, lIdx) => {
               const transferAtThisStop = route.transfers_info[lIdx];
 
               return (
@@ -211,7 +231,7 @@ export const RouteTile: React.FC<RouteTileProps> = ({
                     <div className="flex flex-wrap items-center justify-between pb-3 border-b border-[#F1EFE9] gap-2">
                       <div className="flex items-center space-x-2">
                         <span className="font-mono text-xs font-black bg-[#0F172A] text-white px-2 py-0.5">
-                          LEG {lIdx + 1}
+                          LEG {lIdx + 1} // RAIL
                         </span>
                         <span className="font-mono text-sm font-bold text-[#0F172A]">
                           Train {leg.train_number} // {leg.train_name}
@@ -315,6 +335,74 @@ export const RouteTile: React.FC<RouteTileProps> = ({
                 </div>
               );
             })}
+
+            {/* BUS LEGS */}
+            {route.bus_legs?.map((bus, bIdx) => (
+              <div key={bus.operator_code + bIdx} className="space-y-3">
+                <div className="border border-[#F59E0B] bg-[#FFFBEB] p-4">
+                  <div className="flex flex-wrap items-center justify-between pb-3 border-b border-[#FEF3C7] gap-2">
+                    <div className="flex items-center space-x-2">
+                      <span className="font-mono text-xs font-black bg-[#D97706] text-white px-2 py-0.5">
+                        BUS LEG {bIdx + 1} // HIGHWAY
+                      </span>
+                      <span className="font-mono text-sm font-bold text-[#92400E]">
+                        {bus.operator_name} ({bus.bus_type})
+                      </span>
+                    </div>
+                    <span className="font-mono text-xs font-bold bg-[#FEF3C7] text-[#92400E] border border-[#FDE68A] px-2 py-0.5">
+                      Est. Fare: ₹{bus.fare}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3">
+                    <div className="border-l-2 border-[#D97706] pl-3">
+                      <div className="text-xs font-mono text-[#92400E]">DEPARTURE TERMINAL</div>
+                      <div className="text-base font-black font-mono text-[#0F172A]">
+                        {bus.departure_time?.slice(0, 5)}
+                        <span className="ml-2 text-xs font-bold bg-[#FEF3C7] text-[#92400E] border border-[#FDE68A] px-1.5 py-0.5">
+                          Bus Bay
+                        </span>
+                      </div>
+                      <div className="text-xs font-bold text-[#0F172A]">
+                        {bus.from_terminal}
+                      </div>
+                      {bus.walk_to_terminal_min && (
+                        <div className="text-[11px] font-mono text-[#B45309] mt-0.5">
+                          ~{bus.walk_to_terminal_min}m transfer walk from railway station
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="border-l-2 border-[#DC2626] pl-3">
+                      <div className="text-xs font-mono text-[#92400E]">ARRIVAL TERMINAL</div>
+                      <div className="text-base font-black font-mono text-[#0F172A]">
+                        {bus.arrival_time?.slice(0, 5)}
+                        <span className="ml-2 text-xs font-bold bg-[#FEF2F2] text-[#DC2626] border border-[#FECACA] px-1.5 py-0.5">
+                          Terminal Drop
+                        </span>
+                      </div>
+                      <div className="text-xs font-bold text-[#0F172A]">
+                        {bus.to_terminal}
+                      </div>
+                      {bus.walk_from_terminal_min && (
+                        <div className="text-[11px] font-mono text-[#B45309] mt-0.5">
+                          ~{bus.walk_from_terminal_min}m walk to onward railway platform
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-3 pt-2 border-t border-[#FEF3C7] flex flex-wrap items-center justify-between text-[11px] font-mono text-[#92400E]">
+                    <div>
+                      Features: <span className="font-bold">{bus.is_ac ? 'A/C Deluxe' : 'Non-A/C'} {bus.rating ? `· ★ ${bus.rating}` : ''}</span>
+                    </div>
+                    <div>
+                      Duration: <span className="font-bold">{Math.floor(bus.duration_minutes / 60)}h {bus.duration_minutes % 60}m</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
 
           {/* ARBITRAGE NOTICE BANNER */}
@@ -332,24 +420,32 @@ export const RouteTile: React.FC<RouteTileProps> = ({
           <div className="mt-5 pt-4 border-t border-[#CBD5E1] flex flex-wrap items-center justify-between gap-3">
             <button
               onClick={() => {
-                if (route.transfers === 0 || !onCheckRouteAvailability) {
-                  onCheckAvailability(firstLeg.train_number, firstLeg.from_station, lastLeg.to_station, route, firstLeg.train_name);
-                } else {
-                  onCheckRouteAvailability(route);
+                if (hasTrains && firstLeg) {
+                  if (route.transfers === 0 || !onCheckRouteAvailability) {
+                    onCheckAvailability(firstLeg.train_number, firstLeg.from_station, lastLeg?.to_station || firstLeg.to_station, route, firstLeg.train_name);
+                  } else {
+                    onCheckRouteAvailability(route);
+                  }
                 }
               }}
-              className="bg-[#1D4ED8] hover:bg-[#1E40AF] text-white border border-[#0F172A] px-5 py-2.5 font-mono text-xs font-bold uppercase tracking-wider flex items-center space-x-2 shadow-[3px_3px_0px_0px_#0F172A] active:translate-x-0.5 active:translate-y-0.5 transition-all cursor-pointer"
+              className={`bg-[#1D4ED8] hover:bg-[#1E40AF] text-white border border-[#0F172A] px-5 py-2.5 font-mono text-xs font-bold uppercase tracking-wider flex items-center space-x-2 shadow-[3px_3px_0px_0px_#0F172A] active:translate-x-0.5 active:translate-y-0.5 transition-all ${
+                !hasTrains ? 'cursor-default opacity-85 bg-[#4B5563] hover:bg-[#4B5563]' : 'cursor-pointer'
+              }`}
             >
               <span>
-                {route.transfers === 0
+                {!hasTrains
+                  ? 'HIGHWAY BUS SERVICE (DIRECT BOARDING / RTC BOOKING)'
+                  : route.transfers === 0
                   ? 'CHECK DIRECT SEAT AVAILABILITY (SL, 3A, 3E)'
-                  : `CHECK JOURNEY SEATS (${route.legs.length} LEGS)`}
+                  : `CHECK JOURNEY SEATS (${route.legs.length} TRAIN LEGS)`}
               </span>
-              <ArrowRight className="w-3.5 h-3.5" />
+              {hasTrains && <ArrowRight className="w-3.5 h-3.5" />}
             </button>
 
             <span className="text-xs font-mono text-[#64748B]">
-              {route.transfers === 0
+              {!hasTrains
+                ? 'Scheduled Express State RTC & Private Highway Coach'
+                : route.transfers === 0
                 ? 'Sub-second Tier-2 IRCTC Quota Check'
                 : 'Concurrent Leg-by-Leg Multi-Hop IRCTC Verification'}
             </span>

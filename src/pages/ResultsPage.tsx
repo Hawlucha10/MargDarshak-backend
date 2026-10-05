@@ -102,17 +102,47 @@ export default function ResultsPage() {
 
   const activeRoute = results?.routes && results.routes.length > 0 ? results.routes[activeRouteIdx] : null;
 
-  const routeCards: RouteItem[] = (results?.routes || []).map((r, i) => ({
-    id: `route-${i}`,
-    label: r.label,
-    trainName: r.legs[0]?.train_name || 'Train Connection',
-    trainNumber: r.legs.map((l) => l.train_number).join(' → '),
-    departure: r.legs[0]?.departure_time?.slice(0, 5) || '--:--',
-    arrival: (r.bus_legs && r.bus_legs.length > 0
-      ? r.bus_legs[r.bus_legs.length - 1].arrival_time?.slice(0, 5)
-      : r.legs[r.legs.length - 1]?.arrival_time?.slice(0, 5)) || '--:--',
-    duration: r.total_travel_time,
-    fare: r.total_fare ? `₹${r.total_fare}` : '--',
+  const routeCards: RouteItem[] = (results?.routes || []).map((r, i) => {
+    const hasTrains = Boolean(r.legs && r.legs.length > 0);
+    const hasBuses = Boolean(r.bus_legs && r.bus_legs.length > 0);
+    const firstLeg = hasTrains ? r.legs[0] : null;
+    const lastLeg = hasTrains ? r.legs[r.legs.length - 1] : null;
+    const firstBus = hasBuses ? r.bus_legs[0] : null;
+    const lastBus = hasBuses ? r.bus_legs[r.bus_legs.length - 1] : null;
+
+    let computedName = 'Train Connection';
+    if (hasTrains && hasBuses) {
+      computedName = `${firstLeg?.train_name || 'Express Train'} + Express Bus`;
+    } else if (hasTrains) {
+      computedName = firstLeg?.train_name || 'Train Connection';
+    } else if (hasBuses) {
+      computedName = `${firstBus?.operator_name || 'State Highway'} (${firstBus?.bus_type || 'Bus'})`;
+    }
+
+    let computedNumber = '';
+    if (hasTrains && hasBuses) {
+      computedNumber = `${r.legs.map((l) => l.train_number).join(' → ')} + BUS (${firstBus?.operator_code || 'EXPR'})`;
+    } else if (hasTrains) {
+      computedNumber = r.legs.map((l) => l.train_number).join(' → ');
+    } else if (hasBuses) {
+      computedNumber = `BUS // ${firstBus?.operator_code || 'HIGHWAY'}`;
+    }
+
+    const computedDeparture = (firstLeg?.departure_time || firstBus?.departure_time || '--:--').slice(0, 5);
+    const computedArrival = (lastBus && (!lastLeg || r.is_multimodal)
+      ? lastBus.arrival_time
+      : (lastLeg?.arrival_time || lastBus?.arrival_time || '--:--')
+    ).slice(0, 5);
+
+    return {
+      id: `route-${i}`,
+      label: r.label,
+      trainName: computedName,
+      trainNumber: computedNumber,
+      departure: computedDeparture,
+      arrival: computedArrival,
+      duration: r.total_travel_time,
+      fare: r.total_fare ? `₹${r.total_fare}` : '--',
     transfers: r.transfers,
     reliability: r.joint_reliability_percent || `${Math.round(r.reliability_score * 100)}%`,
     hasBusLeg: Boolean(r.is_multimodal || (r.bus_legs && r.bus_legs.length > 0)),
@@ -126,7 +156,8 @@ export default function ResultsPage() {
     weather_advisory: r.weather_advisory,
     time_saved_vs_train_minutes: r.time_saved_vs_train_minutes,
     comfort_score: r.comfort_score,
-  }));
+    };
+  });
 
   const nlpQuery = searchParams.get('nlp') || results?.nlp_query;
   const entities = results?.nlp_interpretation;
