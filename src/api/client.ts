@@ -208,3 +208,16 @@ export async function checkRouteAvailability(
   return res.json();
 }
 
+export async function sendChatMessage(payload: import('./types').ChatRequest): Promise<import('./types').ChatResponse> {
+  const res = await fetch(`${API_BASE}/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Chat request failed with status ${res.status}`);
+  }
+  return res.json();
+}
+

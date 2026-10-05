@@ -181,3 +181,47 @@ export interface TrainLiveStatus {
   source: string;
   cached: boolean;
 }
+
+export interface ChatMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+}
+
+export interface ChatBusOption {
+  route_id: number;
+  route_code: string;
+  operator_name: string;
+  operator_code: string;
+  bus_type: string;
+  departure: string;
+  arrival: string;
+  duration_minutes: number;
+  fare: number;
+  from_terminal: string;
+  to_terminal: string;
+}
+
+export interface ChatRoutePreview {
+  id: string;
+  label: string;
+  duration: string;
+  fare: number;
+  transfers: number;
+  is_multimodal: boolean;
+  legs_summary: string;
+}
+
+export interface ChatRequest {
+  message: string;
+  conversation_history?: ChatMessage[];
+  current_origin?: string;
+  current_destination?: string;
+  travel_date?: string;
+}
+
+export interface ChatResponse {
+  reply: string;
+  suggested_actions?: string[];
+  routes_preview?: ChatRoutePreview[];
+  buses_preview?: ChatBusOption[];
+}
