@@ -12,11 +12,14 @@ const DYNAMIC_PLACEHOLDERS = [
   'Chandigarh se Amritsar dopahar mein...',
 ];
 
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
 export default function SearchBar() {
   const [originCode, setOriginCode] = useState('');
   const [destCode, setDestCode] = useState('');
   const [originDisplay, setOriginDisplay] = useState('');
   const [destDisplay, setDestDisplay] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
   
   // Disallow past dates
   const todayStr = new Date().toISOString().split('T')[0];
@@ -49,15 +52,62 @@ export default function SearchBar() {
     setOriginDisplay(destDisplay);
     setDestCode(tmpCode);
     setDestDisplay(tmpDisp);
+    setErrorMsg('');
   };
 
-  const handleSearch = (e: React.FormEvent) => {
+  const resolveStation = async (displayStr: string, currentCode: string): Promise<string> => {
+    if (currentCode) return currentCode;
+    const trimmed = displayStr.trim();
+    if (!trimmed) return '';
+
+    // Match parenthesized station code e.g. "NEW DELHI (NDLS)" -> "NDLS"
+    const match = trimmed.match(/\(([A-Za-z0-9]+)\)$/);
+    if (match) return match[1].toUpperCase();
+
+    // Direct 2-5 letter code entered e.g. "NDLS"
+    if (/^[A-Za-z]{2,5}$/.test(trimmed)) {
+      return trimmed.toUpperCase();
+    }
+
+    // Auto-resolve against stations API
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/stations/autocomplete?q=${encodeURIComponent(trimmed)}`);
+      if (res.ok) {
+        const list = await res.json();
+        if (list && list.length > 0) return list[0].code;
+      }
+    } catch {}
+
+    return '';
+  };
+
+  const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isNlpMode && nlpQuery.trim()) {
-      navigate(`/results?nlp=${encodeURIComponent(nlpQuery.trim())}`);
-    } else if (originCode && destCode) {
+    setErrorMsg('');
+
+    if (isNlpMode) {
+      if (nlpQuery.trim()) {
+        navigate(`/results?nlp=${encodeURIComponent(nlpQuery.trim())}`);
+      } else {
+        setErrorMsg('Please enter your travel query or destination.');
+      }
+      return;
+    }
+
+    const finalOrigin = await resolveStation(originDisplay, originCode);
+    const finalDest = await resolveStation(destDisplay, destCode);
+
+    if (finalOrigin && finalDest) {
       const dateParam = date || todayStr;
-      navigate(`/results?origin=${encodeURIComponent(originCode)}&destination=${encodeURIComponent(destCode)}&date=${dateParam}`);
+      navigate(`/results?origin=${encodeURIComponent(finalOrigin)}&destination=${encodeURIComponent(finalDest)}&date=${dateParam}`);
+    } else {
+      if (!finalOrigin && !finalDest) {
+        setErrorMsg('Please choose your departure and arrival stations.');
+      } else if (!finalOrigin) {
+        setErrorMsg('Please select a valid origin station.');
+      } else {
+        setErrorMsg('Please select a valid destination station.');
+      }
     }
   };
 
@@ -222,6 +272,13 @@ export default function SearchBar() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Error feedback if fields are incomplete */}
+      {errorMsg && (
+        <div className="mb-3 px-4 py-2 rounded-xl bg-[#E5D5BF]/80 border border-[#4A5D30]/30 text-[#4A5D30] font-semibold text-xs sm:text-sm text-center">
+          {errorMsg}
         </div>
       )}
 
