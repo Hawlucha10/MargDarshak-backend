@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate } from
 import SearchPage from './pages/SearchPage';
 import ResultsPage from './pages/ResultsPage';
 import { ChatAssistant } from './components/ChatAssistant';
+import { ChatProvider } from './context/ChatContext';
 
 function AppContent() {
   const location = useLocation();
@@ -36,7 +37,9 @@ function AppContent() {
 function App() {
   return (
     <Router>
-      <AppContent />
+      <ChatProvider>
+        <AppContent />
+      </ChatProvider>
     </Router>
   );
 }

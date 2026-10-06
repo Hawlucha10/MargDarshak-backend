@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import SearchBar from '../components/SearchBar';
 import InteractiveGrid from '../components/InteractiveGrid';
+import { useChat } from '../context/ChatContext';
 
 const HEADINGS = [
   'Where to next?',
@@ -13,6 +14,7 @@ const HEADINGS = [
 
 export default function SearchPage() {
   const [headingIndex, setHeadingIndex] = useState(0);
+  const { toggleChat } = useChat();
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -53,7 +55,7 @@ export default function SearchPage() {
       {/* Bottom Green Stripe */}
       <footer className="w-full bg-[#4A5D30] py-3.5 px-6 sm:px-10 flex items-center justify-between shrink-0 shadow-lg z-20">
         {/* Logo: MargDarshak in ROSSTEN font (font-normal to prevent synthetic bolding artifacts) */}
-        <div className="flex items-center">
+        <div className="flex-1 flex justify-start items-center">
           <span
             className="text-[#F6F0E6] text-[26px] sm:text-[32px] tracking-wider select-none font-normal"
             style={{ fontFamily: "'ROSSTEN', sans-serif" }}
@@ -62,8 +64,20 @@ export default function SearchPage() {
           </span>
         </div>
 
+        {/* Center: MargDarshak AI text button directly on the strip itself */}
+        <div className="flex-1 flex justify-center items-center">
+          <button
+            type="button"
+            onClick={toggleChat}
+            className="text-[#F6F0E6] hover:text-white text-[16px] sm:text-[18px] tracking-wide font-normal select-none cursor-pointer hover:opacity-85 transition-opacity"
+            style={{ fontFamily: "'Timeless', sans-serif" }}
+          >
+            MargDarshak AI
+          </button>
+        </div>
+
         {/* Slogan at bottom right */}
-        <div className="flex items-center">
+        <div className="flex-1 flex justify-end items-center">
           <p
             className="text-[#F6F0E6]/90 text-[16px] sm:text-[18px] tracking-wide font-normal select-none"
             style={{ fontFamily: "'OFLGoudyStM', Georgia, serif" }}

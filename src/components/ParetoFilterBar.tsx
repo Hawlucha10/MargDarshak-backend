@@ -45,14 +45,14 @@ const FILTER_ITEMS: Array<{
   label: string;
   icon: React.ElementType;
 }> = [
-  { key: 'ALL', label: 'All Options', icon: Layers },
+  { key: 'ALL', label: 'All routes', icon: Layers },
   { key: 'PARETO_FRONTIER', label: 'Recommended', icon: Sparkles },
   { key: 'FASTEST', label: 'Fastest', icon: Zap },
   { key: 'CHEAPEST', label: 'Cheapest', icon: Coins },
-  { key: 'BALANCED', label: 'Balanced', icon: Scale },
-  { key: 'MOST_RELIABLE', label: 'Most Reliable', icon: ShieldCheck },
-  { key: 'COMFORT_HOMESTAY', label: 'Comfort / Wait-at-Home', icon: Home },
-  { key: 'MULTIMODAL', label: 'Train + Bus Hybrid', icon: Bus },
+  { key: 'BALANCED', label: 'Best balance', icon: Scale },
+  { key: 'MOST_RELIABLE', label: 'Most reliable', icon: ShieldCheck },
+  { key: 'COMFORT_HOMESTAY', label: 'Less waiting', icon: Home },
+  { key: 'MULTIMODAL', label: 'Train + bus', icon: Bus },
 ];
 
 export const ParetoFilterBar: React.FC<ParetoFilterBarProps> = ({
@@ -84,10 +84,10 @@ export const ParetoFilterBar: React.FC<ParetoFilterBarProps> = ({
             className="bg-stone-50 hover:bg-stone-100 text-[#4A5D30] font-semibold py-1 px-2.5 rounded-lg border border-stone-200 outline-none text-xs transition-colors cursor-pointer font-['Timeless']"
           >
             <option value="best_match">Best Match</option>
-            <option value="duration">Fastest Duration</option>
-            <option value="fare">Lowest Fare</option>
-            <option value="reliability">Highest Reliability</option>
-            <option value="comfort">Best Comfort Score</option>
+            <option value="duration">Fastest First</option>
+            <option value="fare">Cheapest First</option>
+            <option value="reliability">Most Reliable</option>
+            <option value="comfort">Less Waiting</option>
           </select>
         </div>
       </div>

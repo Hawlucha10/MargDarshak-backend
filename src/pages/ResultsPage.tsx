@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import RouteMap from '../components/RouteMap';
 import RouteCard, { type RouteItem } from '../components/RouteCard';
 import ParetoFilterBar, { type ParetoFilterKey, type ParetoFilterCounts } from '../components/ParetoFilterBar';
+import { useChat } from '../context/ChatContext';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -87,6 +88,7 @@ function formatDateBadge(dateStr?: string, daysToAdd: number = 0): string {
 export default function ResultsPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { toggleChat } = useChat();
   const [results, setResults] = useState<SearchResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMsgIndex, setLoadingMsgIndex] = useState(0);
@@ -400,8 +402,11 @@ export default function ResultsPage() {
           {!loading && needsClarification && (
             <div className="bg-[#F6F0E6] rounded-2xl p-6 mb-5 border border-[#4A5D30]/20 shadow-sm animate-fadeIn font-['Timeless']">
               <div className="flex items-start gap-3.5 mb-4">
-                <div className="w-10 h-10 rounded-xl bg-[#E5D5BF] border border-[#4A5D30]/25 flex items-center justify-center text-[#4A5D30] text-lg shrink-0">
-                  🧭
+                <div className="w-10 h-10 rounded-xl bg-[#E5D5BF] border border-[#4A5D30]/25 flex items-center justify-center text-[#4A5D30] shrink-0">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="10" strokeWidth="2" />
+                    <polygon points="12 8 16 16 12 14 8 16" fill="currentColor" />
+                  </svg>
                 </div>
                 <div>
                   <h3 className="font-['Timeless'] text-lg font-bold text-[#4A5D30]">
@@ -556,7 +561,7 @@ export default function ResultsPage() {
       {/* Inverted Architectural Bottom Strip (Page 1 footer with inverted colors: light cream bg, dark green text & logo) */}
       <footer className="w-full bg-[#F6F0E6] border-t border-[#4A5D30]/25 py-3.5 px-6 sm:px-10 flex items-center justify-between shrink-0 z-20 shadow-md">
         {/* Logo: MargDarshak in ROSSTEN font - dark green! */}
-        <div className="flex items-center">
+        <div className="flex-1 flex justify-start items-center">
           <Link
             to="/"
             className="text-[#4A5D30] text-[26px] sm:text-[32px] tracking-wider select-none font-normal hover:opacity-85 transition-opacity"
@@ -566,8 +571,20 @@ export default function ResultsPage() {
           </Link>
         </div>
 
+        {/* Center: MargDarshak AI text button directly on the strip itself */}
+        <div className="flex-1 flex justify-center items-center">
+          <button
+            type="button"
+            onClick={toggleChat}
+            className="text-[#4A5D30] hover:text-[#3D4C27] text-[16px] sm:text-[18px] tracking-wide font-semibold select-none cursor-pointer hover:opacity-85 transition-opacity"
+            style={{ fontFamily: "'Timeless', sans-serif" }}
+          >
+            MargDarshak AI
+          </button>
+        </div>
+
         {/* Slogan naturally positioned at bottom right */}
-        <div className="flex items-center">
+        <div className="flex-1 flex justify-end items-center">
           <p
             className="text-[#4A5D30]/90 text-[16px] sm:text-[18px] tracking-wide font-normal select-none"
             style={{ fontFamily: "'OFLGoudyStM', Georgia, serif" }}

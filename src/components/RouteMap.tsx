@@ -253,7 +253,7 @@ function StationCanvasLayer({
 
         ctx.font = 'bold 12px Timeless, system-ui, sans-serif';
         ctx.fillStyle = '#4A5D30';
-        ctx.fillText(`🟢 Origin: ${s.n} (${s.c})`, pt.x + 11, pt.y + 4);
+        ctx.fillText(`Origin: ${s.n} (${s.c})`, pt.x + 11, pt.y + 4);
       } else if (s.routeRole === 'DESTINATION') {
         // Destination Pin / Dot
         ctx.beginPath();
@@ -271,7 +271,7 @@ function StationCanvasLayer({
 
         ctx.font = 'bold 12px Timeless, system-ui, sans-serif';
         ctx.fillStyle = '#C05621';
-        ctx.fillText(`🏁 Dest: ${s.n} (${s.c})`, pt.x + 11, pt.y + 4);
+        ctx.fillText(`Destination: ${s.n} (${s.c})`, pt.x + 11, pt.y + 4);
       } else if (s.routeRole === 'TRANSFER') {
         // Transfer Junction
         ctx.beginPath();
@@ -284,7 +284,7 @@ function StationCanvasLayer({
 
         ctx.font = 'bold 11px Timeless, system-ui, sans-serif';
         ctx.fillStyle = '#D97706';
-        ctx.fillText(`🔄 ${s.n}`, pt.x + 9, pt.y + 4);
+        ctx.fillText(`Change: ${s.n}`, pt.x + 9, pt.y + 4);
       } else if (s.routeRole === 'BUS_STOP') {
         // Multimodal Bus Route Dot (Highway Amber)
         ctx.beginPath();
@@ -412,20 +412,20 @@ function CustomMapControls({
       <button
         type="button"
         onClick={onResetIndia}
-        className="px-2.5 py-1.5 bg-[#F6F0E6] hover:bg-[#E5D5BF] text-[#4A5D30] rounded-xl shadow-md border border-[#4A5D30]/25 text-[11px] font-bold tracking-wide transition-colors cursor-pointer flex items-center gap-1.5"
+        className="px-3 py-1.5 bg-[#F6F0E6] hover:bg-[#E5D5BF] text-[#4A5D30] rounded-xl shadow-md border border-[#4A5D30]/25 text-[11px] font-bold tracking-wide transition-colors cursor-pointer"
         title="View All India Station Network"
       >
-        <span>🇮🇳</span> Whole India
+        Whole India
       </button>
 
       {routeCoords.length >= 2 && (
         <button
           type="button"
           onClick={onFocusRoute}
-          className="px-2.5 py-1.5 bg-[#4A5D30] hover:bg-[#3D4C27] text-[#F6F0E6] rounded-xl shadow-md text-[11px] font-bold tracking-wide transition-colors cursor-pointer flex items-center gap-1.5"
+          className="px-3 py-1.5 bg-[#4A5D30] hover:bg-[#3D4C27] text-[#F6F0E6] rounded-xl shadow-md text-[11px] font-bold tracking-wide transition-colors cursor-pointer"
           title="Focus on Active Route Corridor"
         >
-          <span>🎯</span> Focus Route
+          Focus Route
         </button>
       )}
     </div>
@@ -744,12 +744,12 @@ export default function RouteMap({ legs = [], busLegs = [] }: Props) {
           </div>
           {hoveredStation.routeRole && (
             <div className="text-[11px] font-medium text-stone-700 mt-0.5 flex items-center gap-1">
-              {hoveredStation.routeRole === 'ORIGIN' && <span className="text-emerald-700 font-bold">🟢 Origin Station</span>}
-              {hoveredStation.routeRole === 'DESTINATION' && <span className="text-amber-800 font-bold">🏁 Destination Station</span>}
-              {hoveredStation.routeRole === 'TRANSFER' && <span className="text-amber-700 font-bold">🔄 Interchange Station</span>}
-              {hoveredStation.routeRole === 'TRAIN_STOP' && <span className="text-[#4A5D30] font-semibold">🚂 Scheduled Train Stop</span>}
-              {hoveredStation.routeRole === 'TRAIN_CORRIDOR' && <span className="text-[#4A5D30]/85">🛤️ Railway Corridor Station</span>}
-              {hoveredStation.routeRole === 'BUS_STOP' && <span className="text-[#B45309] font-semibold">🚌 Bus Corridor Station</span>}
+              {hoveredStation.routeRole === 'ORIGIN' && <span className="text-emerald-700 font-bold">Origin Station</span>}
+              {hoveredStation.routeRole === 'DESTINATION' && <span className="text-amber-800 font-bold">Destination Station</span>}
+              {hoveredStation.routeRole === 'TRANSFER' && <span className="text-amber-700 font-bold">Change Station</span>}
+              {hoveredStation.routeRole === 'TRAIN_STOP' && <span className="text-[#4A5D30] font-semibold">Scheduled Train Stop</span>}
+              {hoveredStation.routeRole === 'TRAIN_CORRIDOR' && <span className="text-[#4A5D30]/85">Railway Corridor Station</span>}
+              {hoveredStation.routeRole === 'BUS_STOP' && <span className="text-[#B45309] font-semibold">Bus Stop</span>}
             </div>
           )}
         </div>
@@ -763,7 +763,7 @@ export default function RouteMap({ legs = [], busLegs = [] }: Props) {
         </span>
         <span className="text-stone-400">·</span>
         <span className="text-stone-600 font-medium">
-          {currentZoom >= 7 ? '🔍 City Names Visible' : 'Zoom in for city names'}
+          {currentZoom >= 7 ? 'City names visible' : 'Zoom in for city names'}
         </span>
       </div>
 

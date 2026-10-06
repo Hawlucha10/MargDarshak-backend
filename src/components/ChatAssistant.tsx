@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { sendChatMessage } from '../api/client';
 import type { ChatMessage, ChatBusOption, ChatRoutePreview } from '../api/types';
+import { useChat } from '../context/ChatContext';
 
 interface ChatAssistantProps {
   currentOrigin?: string;
@@ -22,7 +23,7 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({
   travelDate,
   onSelectRoute,
 }) => {
-  const [isOpen, setIsOpen] = useState(false);
+  const { isOpen, closeChat } = useChat();
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [messages, setMessages] = useState<ExtendedChatMessage[]>([
@@ -123,41 +124,12 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({
     ]);
   };
 
-  return (
-    <div className={`fixed z-50 font-['Timeless'] ${isOpen ? 'bottom-6 right-4 sm:right-6' : 'bottom-[26px] sm:bottom-[28px] left-1/2 -translate-x-1/2'}`}>
-      {/* Floating Toggle Button - In the middle of page and bottom stripe */}
-      {!isOpen && (
-        <button
-          onClick={() => setIsOpen(true)}
-          className="group flex items-center gap-2.5 px-5 py-2.5 sm:py-3 bg-[#4A5D30] hover:bg-[#3D4C27] text-[#F6F0E6] rounded-full shadow-2xl transition-all duration-300 hover:scale-105 active:scale-95 border-2 border-[#E5D5BF] whitespace-nowrap cursor-pointer"
-          aria-label="Open MargDarshak AI Travel Assistant"
-        >
-          <div className="relative">
-            <svg
-              className="w-6 h-6 text-[#F6F0E6]"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
-              />
-            </svg>
-            <span className="absolute -top-1 -right-1 flex h-3 w-3">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#E5D5BF] opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-[#E5D5BF]"></span>
-            </span>
-          </div>
-          <span className="font-semibold tracking-wide text-sm font-['Timeless']">MargDarshak AI</span>
-        </button>
-      )}
+  if (!isOpen) return null;
 
+  return (
+    <div className="fixed z-50 font-['Timeless'] bottom-16 right-4 sm:right-6 animate-in fade-in slide-in-from-bottom-5 duration-300">
       {/* Slide-Up Chat Window */}
-      {isOpen && (
-        <div className="w-[390px] max-w-[95vw] h-[580px] max-h-[85vh] bg-[#F6F0E6] rounded-2xl shadow-2xl border-2 border-[#4A5D30]/20 flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-5 duration-300 font-['Timeless']">
+      <div className="w-[390px] max-w-[95vw] h-[580px] max-h-[85vh] bg-[#F6F0E6] rounded-2xl shadow-2xl border-2 border-[#4A5D30]/20 flex flex-col overflow-hidden font-['Timeless']">
           {/* Header */}
           <div className="bg-[#4A5D30] text-white px-4 py-3 flex items-center justify-between shadow-md">
             <div className="flex items-center gap-2.5">
@@ -193,9 +165,9 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({
                 Clear
               </button>
               <button
-                onClick={() => setIsOpen(false)}
+                onClick={closeChat}
                 title="Minimize"
-                className="p-1.5 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                className="p-1.5 hover:text-white hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -235,7 +207,7 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({
                 {m.busesPreview && m.busesPreview.length > 0 && (
                   <div className="mt-2.5 w-full space-y-1.5">
                     <p className="text-[11px] font-semibold text-[#4A5D30] uppercase tracking-wider px-1">
-                      🚌 Bus Corridors Available
+                      Available bus options
                     </p>
                     {m.busesPreview.slice(0, 3).map((b, idx) => (
                       <div
@@ -267,7 +239,7 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({
                 {m.routesPreview && m.routesPreview.length > 0 && (
                   <div className="mt-2.5 w-full space-y-1.5">
                     <p className="text-[11px] font-semibold text-[#4A5D30] uppercase tracking-wider px-1">
-                      🚆 Recommended Travel Options
+                      Recommended travel options
                     </p>
                     {m.routesPreview.map((r, idx) => (
                       <div
@@ -280,7 +252,7 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({
                         </div>
                         <div className="flex justify-between text-gray-600 text-[11px]">
                           <span>Duration: {r.duration}</span>
-                          <span>{r.transfers === 0 ? 'Direct' : `${r.transfers} Transfer(s)`}</span>
+                          <span>{r.transfers === 0 ? 'Direct (no changes)' : `${r.transfers} ${r.transfers === 1 ? 'change' : 'changes'}`}</span>
                         </div>
                         <div className="text-[10px] text-gray-500 line-clamp-2">
                           {r.legs_summary}
@@ -298,11 +270,11 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({
                   </div>
                 )}
 
-                {/* Suggested Action Chips (lightbulbs removed, Timeless font applied) */}
+                {/* Suggested Action Chips (emojis removed, Timeless font applied) */}
                 {m.suggestedActions && m.suggestedActions.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {m.suggestedActions.map((action, idx) => {
-                      const cleanAction = action.replace(/^💡\s*/, '');
+                      const cleanAction = action.replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '').trim();
                       return (
                         <button
                           key={idx}
@@ -361,7 +333,6 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({
             </div>
           </div>
         </div>
-      )}
     </div>
   );
 };

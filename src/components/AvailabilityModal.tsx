@@ -50,7 +50,7 @@ export const AvailabilityModal: React.FC<AvailabilityModalProps> = ({
             </h3>
             {!isRouteMode && displayFrom && displayTo && (
               <div className="text-xs font-mono text-[#64748B] mt-0.5">
-                {displayFrom} ➔ {displayTo} {displayDate ? `• Date: ${displayDate}` : ''}
+                {displayFrom} → {displayTo} {displayDate ? `• Date: ${displayDate}` : ''}
               </div>
             )}
           </div>
@@ -72,7 +72,7 @@ export const AvailabilityModal: React.FC<AvailabilityModalProps> = ({
               </p>
               {displayTrainNumber && (
                 <p className="font-mono text-xs text-[#64748B]">
-                  Querying Train {displayTrainNumber} {displayTrainName ? `(${displayTrainName})` : ''} • {displayFrom} ➔ {displayTo}
+                  Querying Train {displayTrainNumber} {displayTrainName ? `(${displayTrainName})` : ''} • {displayFrom} → {displayTo}
                 </p>
               )}
             </div>
@@ -93,7 +93,7 @@ export const AvailabilityModal: React.FC<AvailabilityModalProps> = ({
               <div>
                 <span className="text-[#64748B] block">CORRIDOR</span>
                 <span className="font-bold text-[#0F172A]">
-                  {routeData.legs[0]?.from_station} ➔ {routeData.legs[routeData.legs.length - 1]?.to_station}
+                  {routeData.legs[0]?.from_station} → {routeData.legs[routeData.legs.length - 1]?.to_station}
                 </span>
               </div>
               <div>
@@ -154,7 +154,7 @@ export const AvailabilityModal: React.FC<AvailabilityModalProps> = ({
                         </span>
                       </div>
                       <div className="text-xs font-mono font-bold text-[#1D4ED8]">
-                        {leg.from_station} ➔ {leg.to_station}
+                        {leg.from_station} → {leg.to_station}
                       </div>
                     </div>
 
@@ -250,7 +250,7 @@ export const AvailabilityModal: React.FC<AvailabilityModalProps> = ({
               </div>
               <div>
                 <span className="text-[#64748B] block">CORRIDOR</span>
-                <span className="font-bold text-[#0F172A]">{trainData.from_station} ➔ {trainData.to_station}</span>
+                <span className="font-bold text-[#0F172A]">{trainData.from_station} → {trainData.to_station}</span>
               </div>
               <div>
                 <span className="text-[#64748B] block">DATE</span>
@@ -277,7 +277,7 @@ export const AvailabilityModal: React.FC<AvailabilityModalProps> = ({
                   <div className="font-bold text-[#0F172A] uppercase">IRCTC Train Query Details:</div>
                   <div className="flex flex-wrap gap-4 text-[#64748B]">
                     <span>Train: <strong className="text-[#0F172A]">{trainData.train_number} ({trainData.train_name})</strong></span>
-                    <span>Route: <strong className="text-[#0F172A]">{trainData.from_station} ➔ {trainData.to_station}</strong></span>
+                    <span>Route: <strong className="text-[#0F172A]">{trainData.from_station} → {trainData.to_station}</strong></span>
                     <span>Date: <strong className="text-[#0F172A]">{trainData.travel_date}</strong></span>
                   </div>
                 </div>
@@ -302,7 +302,7 @@ export const AvailabilityModal: React.FC<AvailabilityModalProps> = ({
                   <div className="bg-[#EFF6FF] border-2 border-[#1D4ED8] p-4 font-mono text-xs space-y-2 mb-5 shadow-[4px_4px_0px_0px_#1D4ED8]">
                     <div className="flex items-center space-x-2 text-[#1D4ED8] font-black uppercase text-xs">
                       <Sparkles className="w-4 h-4 shrink-0 text-[#1D4ED8]" />
-                      <span>💡 ConfirmTkt Upstream Quota Arbitrage Found</span>
+                      <span>Tip to get a confirmed seat</span>
                     </div>
                     <div className="text-[#0F172A] leading-relaxed text-xs">
                       {trainData.arbitrage_recommendation.instruction}
@@ -415,7 +415,7 @@ export const AvailabilityModal: React.FC<AvailabilityModalProps> = ({
               </div>
               <div>
                 <span className="text-[#64748B] block">CORRIDOR</span>
-                <span className="font-bold text-[#0F172A]">{displayFrom} ➔ {displayTo}</span>
+                <span className="font-bold text-[#0F172A]">{displayFrom} → {displayTo}</span>
               </div>
               <div>
                 <span className="text-[#64748B] block">DATE</span>
@@ -441,7 +441,7 @@ export const AvailabilityModal: React.FC<AvailabilityModalProps> = ({
                 <div className="font-bold text-[#0F172A] uppercase">IRCTC Train Query Details:</div>
                 <div className="flex flex-wrap gap-4 text-[#64748B]">
                   <span>Train: <strong className="text-[#0F172A]">{displayTrainNumber} ({displayTrainName || 'Express'})</strong></span>
-                  <span>Route: <strong className="text-[#0F172A]">{displayFrom} ➔ {displayTo}</strong></span>
+                  <span>Route: <strong className="text-[#0F172A]">{displayFrom} → {displayTo}</strong></span>
                   {displayDate && <span>Date: <strong className="text-[#0F172A]">{displayDate}</strong></span>}
                 </div>
               </div>
