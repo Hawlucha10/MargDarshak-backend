@@ -4,6 +4,7 @@ import RouteMap from '../components/RouteMap';
 import RouteCard, { type RouteItem } from '../components/RouteCard';
 import ParetoFilterBar, { type ParetoFilterKey, type ParetoFilterCounts } from '../components/ParetoFilterBar';
 import { useChat } from '../context/ChatContext';
+import { getRecentSearches, saveRecentSearch, type RecentSearchItem } from '../utils/recentSearches';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -108,6 +109,13 @@ export default function ResultsPage() {
   });
   const [sortBy, setSortBy] = useState<string>('best_match');
   const [clarifyInput, setClarifyInput] = useState('');
+  const [recentSearches, setRecentSearches] = useState<RecentSearchItem[]>(() => getRecentSearches());
+
+  useEffect(() => {
+    const handleUpdate = () => setRecentSearches(getRecentSearches());
+    window.addEventListener('recentSearchesUpdated', handleUpdate);
+    return () => window.removeEventListener('recentSearchesUpdated', handleUpdate);
+  }, []);
 
   useEffect(() => {
     if (!loading) return;
@@ -132,6 +140,18 @@ export default function ResultsPage() {
         const data = await res.json();
         setResults(data);
         setSelectedRouteId('route-0');
+
+        if (data.origin && data.destination && data.total_routes_found > 0) {
+          saveRecentSearch({
+            type: 'nlp',
+            query: nlp,
+            originCode: data.origin,
+            destCode: data.destination,
+            label: `${data.origin} → ${data.destination}`,
+            date: data.travel_date,
+          });
+        }
+
         if (data.nlp_interpretation?.priority) {
           const p = data.nlp_interpretation.priority.toUpperCase();
           if (p === 'MULTIMODAL' || data.nlp_interpretation?.bus_only || nlp.toLowerCase().includes('bus')) {
@@ -168,6 +188,16 @@ export default function ResultsPage() {
         const data = await res.json();
         setResults(data);
         setSelectedRouteId('route-0');
+
+        if (data.origin && data.destination && data.total_routes_found > 0) {
+          saveRecentSearch({
+            type: 'station',
+            originCode: data.origin,
+            destCode: data.destination,
+            label: `${data.origin} → ${data.destination}`,
+            date: date,
+          });
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not fetch routes');
@@ -380,7 +410,7 @@ export default function ResultsPage() {
         <div className="w-full md:w-[60%] h-[60vh] md:h-full overflow-y-auto bg-[#E5D5BF] p-5 sm:p-7 md:p-8 flex flex-col shadow-inner font-['Timeless']">
           {/* Header with Title and Query Metrics */}
           <div className="mb-4 pt-1 font-['Timeless']">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <h2 className="text-2xl sm:text-3xl md:text-4xl font-['Timeless'] text-[#4A5D30] font-bold tracking-tight">
                 {loading
                   ? 'Planning Routes...'
@@ -390,6 +420,32 @@ export default function ResultsPage() {
                   ? `${results.total_routes_found} Optimal Routes`
                   : 'No Direct Routes Found'}
               </h2>
+
+              {/* Quick switch to recent searches */}
+              {recentSearches.length > 0 && !loading && (
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-stone-600 text-xs font-semibold uppercase tracking-wider">Recent:</span>
+                  {recentSearches.map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => {
+                        if (s.type === 'station' && s.originCode && s.destCode) {
+                          navigate(`/results?origin=${encodeURIComponent(s.originCode)}&destination=${encodeURIComponent(s.destCode)}&date=${encodeURIComponent(s.date || '')}`);
+                        } else if (s.query) {
+                          navigate(`/results?nlp=${encodeURIComponent(s.query)}`);
+                        } else {
+                          navigate(`/results?nlp=${encodeURIComponent(s.label)}`);
+                        }
+                      }}
+                      className="bg-[#F6F0E6] hover:bg-[#E5D5BF] border border-[#4A5D30]/25 text-[#4A5D30] px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1 active:scale-95 shadow-2xs"
+                      title={`Switch to ${s.label}`}
+                    >
+                      <span>{s.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             {results && !loading && !needsClarification && (
               <p className="text-xs font-['Timeless'] text-stone-700 mt-1 uppercase tracking-wider font-semibold">
@@ -437,6 +493,35 @@ export default function ResultsPage() {
                   Search
                 </button>
               </form>
+
+              {/* Recent searches in clarification card */}
+              {recentSearches.length > 0 && (
+                <div className="font-['Timeless'] mb-3">
+                  <p className="text-xs font-['Timeless'] font-semibold text-[#4A5D30] uppercase tracking-wider mb-2">
+                    Recent searches:
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {recentSearches.map((s) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => {
+                          if (s.type === 'station' && s.originCode && s.destCode) {
+                            navigate(`/results?origin=${encodeURIComponent(s.originCode)}&destination=${encodeURIComponent(s.destCode)}&date=${encodeURIComponent(s.date || '')}`);
+                          } else if (s.query) {
+                            navigate(`/results?nlp=${encodeURIComponent(s.query)}`);
+                          } else {
+                            navigate(`/results?nlp=${encodeURIComponent(s.label)}`);
+                          }
+                        }}
+                        className="bg-[#FAF7F2] hover:bg-[#E5D5BF] border border-[#4A5D30]/30 text-[#4A5D30] px-3 py-1.5 rounded-lg text-xs font-['Timeless'] font-bold transition-all cursor-pointer flex items-center gap-1"
+                      >
+                        <span>{s.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Popular Route Suggestions */}
               <div className="font-['Timeless']">

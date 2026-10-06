@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import StationAutocomplete from './StationAutocomplete';
 import CustomDatePicker from './CustomDatePicker';
+import { getRecentSearches, saveRecentSearch, type RecentSearchItem } from '../utils/recentSearches';
 
 const DYNAMIC_PLACEHOLDERS = [
   'Delhi to Mumbai before 8 PM...',
@@ -28,7 +29,16 @@ export default function SearchBar() {
   const [nlpQuery, setNlpQuery] = useState('');
   const [isNlpMode, setIsNlpMode] = useState(false);
   const [placeholderIdx, setPlaceholderIdx] = useState(0);
+  const [recentSearches, setRecentSearches] = useState<RecentSearchItem[]>([]);
   const navigate = useNavigate();
+
+  // Load and subscribe to recent searches
+  useEffect(() => {
+    setRecentSearches(getRecentSearches());
+    const handleUpdate = () => setRecentSearches(getRecentSearches());
+    window.addEventListener('recentSearchesUpdated', handleUpdate);
+    return () => window.removeEventListener('recentSearchesUpdated', handleUpdate);
+  }, []);
 
   // Dynamic placeholder cycling for NLP search
   useEffect(() => {
@@ -81,12 +91,34 @@ export default function SearchBar() {
     return '';
   };
 
+  const handleSelectRecent = (item: RecentSearchItem) => {
+    if (item.type === 'station' && item.originCode && item.destCode) {
+      setOriginCode(item.originCode);
+      setOriginDisplay(item.origin || item.originCode);
+      setDestCode(item.destCode);
+      setDestDisplay(item.destination || item.destCode);
+      const dateParam = date || todayStr;
+      navigate(`/results?origin=${encodeURIComponent(item.originCode)}&destination=${encodeURIComponent(item.destCode)}&date=${dateParam}`);
+    } else if (item.query) {
+      setNlpQuery(item.query);
+      navigate(`/results?nlp=${encodeURIComponent(item.query)}`);
+    } else if (item.label) {
+      setNlpQuery(item.label);
+      navigate(`/results?nlp=${encodeURIComponent(item.label)}`);
+    }
+  };
+
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
 
     if (isNlpMode) {
       if (nlpQuery.trim()) {
+        saveRecentSearch({
+          type: 'nlp',
+          query: nlpQuery.trim(),
+          label: nlpQuery.trim(),
+        });
         navigate(`/results?nlp=${encodeURIComponent(nlpQuery.trim())}`);
       } else {
         setErrorMsg('Please enter your travel query or destination.');
@@ -99,6 +131,15 @@ export default function SearchBar() {
 
     if (finalOrigin && finalDest) {
       const dateParam = date || todayStr;
+      saveRecentSearch({
+        type: 'station',
+        origin: originDisplay || finalOrigin,
+        originCode: finalOrigin,
+        destination: destDisplay || finalDest,
+        destCode: finalDest,
+        label: `${finalOrigin} → ${finalDest}`,
+        date: dateParam,
+      });
       navigate(`/results?origin=${encodeURIComponent(finalOrigin)}&destination=${encodeURIComponent(finalDest)}&date=${dateParam}`);
     } else {
       if (!finalOrigin && !finalDest) {
@@ -314,33 +355,63 @@ export default function SearchBar() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
               <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 sm:pb-0">
                 <span className="text-[12px] sm:text-[13px] font-semibold text-stone-700 uppercase tracking-wider shrink-0 font-['OFLGoudyStM'] leading-none">
-                  Try:
+                  {recentSearches.length > 0 ? 'Recent:' : 'Try:'}
                 </span>
                 <div className="flex items-center gap-1.5 font-['Timeless']">
-                  <button
-                    type="button"
-                    disabled={!isNlpMode}
-                    onClick={() => setNlpQuery('Pune se Gwalior agle hafte subah')}
-                    className="h-8 sm:h-8.5 px-3 rounded-full text-[12px] sm:text-[13px] font-semibold border bg-[#FAF7F2] border-[#4A5D30]/20 text-stone-700 hover:bg-[#E5D5BF] transition-all cursor-pointer inline-flex items-center justify-center leading-none whitespace-nowrap active:scale-95"
-                  >
-                    <span className="translate-y-[0.5px]">Pune → Gwalior</span>
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!isNlpMode}
-                    onClick={() => setNlpQuery('Delhi to Mumbai before 8 PM')}
-                    className="h-8 sm:h-8.5 px-3 rounded-full text-[12px] sm:text-[13px] font-semibold border bg-[#FAF7F2] border-[#4A5D30]/20 text-stone-700 hover:bg-[#E5D5BF] transition-all cursor-pointer inline-flex items-center justify-center leading-none whitespace-nowrap active:scale-95"
-                  >
-                    <span className="translate-y-[0.5px]">Delhi → Mumbai</span>
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!isNlpMode}
-                    onClick={() => setNlpQuery('Kanpur se Lucknow sabse sasta')}
-                    className="hidden md:inline-flex h-8 sm:h-8.5 px-3 rounded-full text-[12px] sm:text-[13px] font-semibold border bg-[#FAF7F2] border-[#4A5D30]/20 text-stone-700 hover:bg-[#E5D5BF] transition-all cursor-pointer items-center justify-center leading-none whitespace-nowrap active:scale-95"
-                  >
-                    <span className="translate-y-[0.5px]">Kanpur → Lucknow</span>
-                  </button>
+                  {recentSearches.length > 0 ? (
+                    <>
+                      {recentSearches.map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          disabled={!isNlpMode}
+                          onClick={() => handleSelectRecent(item)}
+                          className="h-8 sm:h-8.5 px-3 rounded-full text-[12px] sm:text-[13px] font-semibold border bg-[#FAF7F2] border-[#4A5D30]/20 text-[#4A5D30] hover:bg-[#E5D5BF] transition-all cursor-pointer inline-flex items-center justify-center leading-none whitespace-nowrap active:scale-95"
+                          title={`Search ${item.label}`}
+                        >
+                          <span className="translate-y-[0.5px]">{item.label}</span>
+                        </button>
+                      ))}
+                      {recentSearches.length === 1 && (
+                        <button
+                          type="button"
+                          disabled={!isNlpMode}
+                          onClick={() => {
+                            setNlpQuery('Delhi to Mumbai before 8 PM');
+                            navigate(`/results?nlp=${encodeURIComponent('Delhi to Mumbai before 8 PM')}`);
+                          }}
+                          className="h-8 sm:h-8.5 px-3 rounded-full text-[12px] sm:text-[13px] font-semibold border bg-[#FAF7F2] border-[#4A5D30]/20 text-stone-700 hover:bg-[#E5D5BF] transition-all cursor-pointer inline-flex items-center justify-center leading-none whitespace-nowrap active:scale-95"
+                        >
+                          <span className="translate-y-[0.5px]">Delhi → Mumbai</span>
+                        </button>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        disabled={!isNlpMode}
+                        onClick={() => {
+                          setNlpQuery('Pune se Gwalior agle hafte subah');
+                          navigate(`/results?nlp=${encodeURIComponent('Pune se Gwalior agle hafte subah')}`);
+                        }}
+                        className="h-8 sm:h-8.5 px-3 rounded-full text-[12px] sm:text-[13px] font-semibold border bg-[#FAF7F2] border-[#4A5D30]/20 text-stone-700 hover:bg-[#E5D5BF] transition-all cursor-pointer inline-flex items-center justify-center leading-none whitespace-nowrap active:scale-95"
+                      >
+                        <span className="translate-y-[0.5px]">Pune → Gwalior</span>
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!isNlpMode}
+                        onClick={() => {
+                          setNlpQuery('Delhi to Mumbai before 8 PM');
+                          navigate(`/results?nlp=${encodeURIComponent('Delhi to Mumbai before 8 PM')}`);
+                        }}
+                        className="h-8 sm:h-8.5 px-3 rounded-full text-[12px] sm:text-[13px] font-semibold border bg-[#FAF7F2] border-[#4A5D30]/20 text-stone-700 hover:bg-[#E5D5BF] transition-all cursor-pointer inline-flex items-center justify-center leading-none whitespace-nowrap active:scale-95"
+                      >
+                        <span className="translate-y-[0.5px]">Delhi → Mumbai</span>
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -371,6 +442,24 @@ export default function SearchBar() {
           <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
         </svg>
       </button>
+
+      {/* Recent Searches Quick Suggestions (Last 2 cached searches) */}
+      {recentSearches.length > 0 && (
+        <div className="mt-3 flex items-center justify-center gap-2 flex-wrap font-['Timeless'] text-xs">
+          <span className="text-stone-600 font-medium font-['OFLGoudyStM']">Recent:</span>
+          {recentSearches.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => handleSelectRecent(item)}
+              className="px-3 py-1 rounded-full bg-[#FAF7F2] hover:bg-[#E5D5BF] border border-[#4A5D30]/25 text-[#4A5D30] font-semibold transition-all cursor-pointer text-xs flex items-center gap-1 active:scale-95"
+              title={`Quick search ${item.label}`}
+            >
+              <span>{item.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
     </form>
   );
 }
