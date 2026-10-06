@@ -110,14 +110,46 @@ function getSimpleLabel(label?: string): string | null {
   }
 }
 
-function cleanTipText(tip?: string): string {
+function cleanTipText(tip?: string, trainNumber?: string): string {
   if (!tip) return '';
   let clean = tip.replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '').trim();
   clean = clean.replace(/^Upstream GNWL Quota:\s*/i, '');
   clean = clean.replace(/^Direct Origin Quota:\s*/i, '');
-  clean = clean.replace(/unlocks confirmed General Quota seats/i, 'helps you get a confirmed seat');
-  clean = clean.replace(/top-priority GNWL confirmed berth allocation/i, 'a high chance of getting a confirmed seat');
-  clean = clean.replace(/distance-slab arbitrage/i, 'special booking options');
+
+  // Extract components if matching upstream pattern:
+  const upstreamMatch = clean.match(
+    /(?:Train\s+(\w+)\s+originates\s+at|This train starts\s+(?:at|from))\s+([^(.]+?(?:\s*\([^)]+\))?)\.\s*If\s+(?:waitlisted|tickets)\s+from\s+([^,]+?)(?:,\s*|\s+are\s+on\s+waiting\s+list,\s*)(?:booking|you can book)\s+from\s+([^(.]+?(?:\s*\([^)]+\))?)\s+with\s+boarding\s+at\s+([^.]+?)\s+(?:unlocks|helps(?: you get)?|to get)\s+a?\s*confirmed\s+(?:General Quota\s+)?seat[s]?(?:\s*\((\+?Rs\.?\s*\d+|extra\s+Rs\.?\s*\d+)\))?/i
+  );
+
+  if (upstreamMatch) {
+    const tNum = upstreamMatch[1] || trainNumber || '';
+    const startStation = upstreamMatch[2].trim();
+    const boardStation = upstreamMatch[3].trim();
+    const rawExtra = upstreamMatch[6] ? upstreamMatch[6].replace(/\+?Rs\.?\s*/i, '₹') : '';
+    const extraFareText = rawExtra ? ` (extra ${rawExtra})` : '';
+    const trainText = tNum ? `this train (${tNum})` : 'this train';
+    return `If you want a confirmed seat, ${trainText} starts at ${startStation}. If tickets from ${boardStation} are on waiting list, you can book from ${startStation} with boarding at ${boardStation} to get a confirmed seat${extraFareText}.`;
+  }
+
+  // If already formatted, return cleaned string
+  if (/^If you want a confirmed? seat/i.test(clean)) {
+    return clean;
+  }
+
+  // If direct origin starting train:
+  if (/starts right (?:at|from)/i.test(clean) || /Boarding at starting terminal/i.test(clean)) {
+    const trainText = trainNumber ? `this train (${trainNumber})` : 'this train';
+    const stMatch = clean.match(/\(([^)]+)\)/);
+    const stName = stMatch ? stMatch[1] : '';
+    return `If you want a confirmed seat, ${trainText} starts right from ${stName || 'your boarding station'}, giving you the best chance of getting a confirmed ticket.`;
+  }
+
+  // General fallback:
+  if (!clean.toLowerCase().includes('if you want a confirm')) {
+    clean = clean.replace(/^Train\s+(\w+)\s+originates\s+at\s+/i, (_m, num) => `If you want a confirmed seat, this train (${num}) starts at `);
+    clean = clean.replace(/^This train starts (?:at|from)\s+/i, 'If you want a confirmed seat, this train starts at ');
+  }
+
   return clean.trim();
 }
 
@@ -370,7 +402,7 @@ export default function RouteCard({ route, index, isActive, onSelect }: RoutePro
                     Tip to get a confirmed seat:
                   </p>
                   <p className="text-stone-600 leading-relaxed">
-                    {cleanTipText(route.fare_arbitrage_tip)}
+                    {cleanTipText(route.fare_arbitrage_tip, route.trainNumber)}
                   </p>
                 </div>
               )}
