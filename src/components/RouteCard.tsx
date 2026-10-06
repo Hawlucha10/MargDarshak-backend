@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 interface Leg {
   train_number: string;
@@ -58,6 +60,8 @@ export interface RouteItem {
   arrivalDate?: string;
   duration: string;
   fare: string;
+  fareMin?: number;
+  fareMax?: number;
   transfers?: number;
   reliability?: string;
   hasBusLeg?: boolean;
@@ -77,7 +81,18 @@ interface RouteProps {
   route: RouteItem;
   index: number;
   isActive?: boolean;
+  isExpanded?: boolean;
   onSelect?: () => void;
+  onToggleExpand?: () => void;
+}
+
+interface ScheduleStop {
+  station_code: string;
+  station_name: string;
+  arrival: string | null;
+  departure: string | null;
+  day: number;
+  stop_sequence?: number;
 }
 
 function formatLayover(minutes: number): string {
@@ -116,7 +131,6 @@ function cleanTipText(tip?: string, trainNumber?: string): string {
   clean = clean.replace(/^Upstream GNWL Quota:\s*/i, '');
   clean = clean.replace(/^Direct Origin Quota:\s*/i, '');
 
-  // Extract components if matching upstream pattern:
   const upstreamMatch = clean.match(
     /(?:Train\s+(\w+)\s+originates\s+at|This train starts\s+(?:at|from))\s+([^(.]+?(?:\s*\([^)]+\))?)\.\s*If\s+(?:waitlisted|tickets)\s+from\s+([^,]+?)(?:,\s*|\s+are\s+on\s+waiting\s+list,\s*)(?:booking|you can book)\s+from\s+([^(.]+?(?:\s*\([^)]+\))?)\s+with\s+boarding\s+at\s+([^.]+?)\s+(?:unlocks|helps(?: you get)?|to get)\s+a?\s*confirmed\s+(?:General Quota\s+)?seat[s]?(?:\s*\((\+?Rs\.?\s*\d+|extra\s+Rs\.?\s*\d+)\))?/i
   );
@@ -131,12 +145,10 @@ function cleanTipText(tip?: string, trainNumber?: string): string {
     return `If you want a confirmed seat, ${trainText} starts at ${startStation}. If tickets from ${boardStation} are on waiting list, you can book from ${startStation} with boarding at ${boardStation} to get a confirmed seat${extraFareText}.`;
   }
 
-  // If already formatted, return cleaned string
   if (/^If you want a confirmed? seat/i.test(clean)) {
     return clean;
   }
 
-  // If direct origin starting train:
   if (/starts right (?:at|from)/i.test(clean) || /Boarding at starting terminal/i.test(clean)) {
     const trainText = trainNumber ? `this train (${trainNumber})` : 'this train';
     const stMatch = clean.match(/\(([^)]+)\)/);
@@ -144,7 +156,6 @@ function cleanTipText(tip?: string, trainNumber?: string): string {
     return `If you want a confirmed seat, ${trainText} starts right from ${stName || 'your boarding station'}, giving you the best chance of getting a confirmed ticket.`;
   }
 
-  // General fallback:
   if (!clean.toLowerCase().includes('if you want a confirm')) {
     clean = clean.replace(/^Train\s+(\w+)\s+originates\s+at\s+/i, (_m, num) => `If you want a confirmed seat, this train (${num}) starts at `);
     clean = clean.replace(/^This train starts (?:at|from)\s+/i, 'If you want a confirmed seat, this train starts at ');
@@ -157,23 +168,77 @@ function cleanWeatherText(text?: string): string {
   if (!text) return '';
   let clean = text.replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '').trim();
   clean = clean.replace(/^Weather Advisory:\s*/i, '');
-  clean = clean.replace(/^Weather Condition:\s*/i, '');
-  clean = clean.replace(/^Weather Advisory:\s*/i, '');
   return clean.trim();
 }
 
-export default function RouteCard({ route, index, isActive, onSelect }: RouteProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
+export default function RouteCard({
+  route,
+  index,
+  isActive,
+  isExpanded: controlledExpanded,
+  onSelect,
+  onToggleExpand,
+}: RouteProps) {
+  const [localExpanded, setLocalExpanded] = useState(false);
+  const isExpanded = controlledExpanded !== undefined ? controlledExpanded : localExpanded;
+
+  const [schedules, setSchedules] = useState<Record<string, ScheduleStop[]>>({});
+  const [loadingSchedule, setLoadingSchedule] = useState<Record<string, boolean>>({});
 
   const formattedIndex = String(index + 1).padStart(2, '0');
 
   const toggleExpand = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setIsExpanded((prev) => !prev);
+    if (onToggleExpand) {
+      onToggleExpand();
+    } else {
+      setLocalExpanded((prev) => !prev);
+    }
   };
+
+  // Fetch full station timetable stops with arrival and departure timings when card expands
+  useEffect(() => {
+    if (!isExpanded || !route.legs) return;
+
+    for (const leg of route.legs) {
+      const tNum = leg.train_number;
+      if (!tNum || schedules[tNum] || loadingSchedule[tNum]) continue;
+
+      setLoadingSchedule((prev) => ({ ...prev, [tNum]: true }));
+      fetch(`${API_BASE}/api/v1/trains/${tNum}/schedule`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data && Array.isArray(data.stops)) {
+            const fromCode = leg.from_station.toUpperCase();
+            const toCode = leg.to_station.toUpperCase();
+            const allStops: ScheduleStop[] = data.stops;
+
+            const fromIdx = allStops.findIndex((s) => s.station_code?.toUpperCase() === fromCode);
+            const toIdx = allStops.findIndex((s) => s.station_code?.toUpperCase() === toCode);
+
+            let filteredStops = allStops;
+            if (fromIdx >= 0 && toIdx >= 0) {
+              const minI = Math.min(fromIdx, toIdx);
+              const maxI = Math.max(fromIdx, toIdx);
+              filteredStops = allStops.slice(minI, maxI + 1);
+              if (fromIdx > toIdx) filteredStops.reverse();
+            }
+            setSchedules((prev) => ({ ...prev, [tNum]: filteredStops }));
+          }
+        })
+        .catch((err) => console.error(`Failed to fetch schedule for train ${tNum}`, err))
+        .finally(() => {
+          setLoadingSchedule((prev) => ({ ...prev, [tNum]: false }));
+        });
+    }
+  }, [isExpanded, route.legs, schedules, loadingSchedule]);
+
+  const minFare = route.fareMin || 345;
+  const maxFare = route.fareMax || 1225;
 
   return (
     <div
+      id={route.id}
       onClick={onSelect}
       className={`bg-brand-white rounded-[22px] p-6 shadow-[var(--shadow-soft)] transition-all cursor-pointer border-2 font-['Timeless'] ${
         isActive
@@ -181,14 +246,14 @@ export default function RouteCard({ route, index, isActive, onSelect }: RoutePro
           : 'border-white/80 hover:-translate-y-0.5 hover:shadow-md'
       }`}
     >
-      {/* Top Bar: Editorial Index Number + Train Name + Fare & Simple Label */}
+      {/* Top Bar: Editorial Index Number + Train Name + Tentative Fare Range & Simple Label */}
       <div className="flex justify-between items-start mb-4 font-['Timeless']">
-        <div className="flex items-start gap-3.5">
+        <div className="flex items-start gap-3.5 min-w-0 pr-2">
           <span className="font-['Timeless'] text-3xl font-normal text-stone-400/60 select-none">
             {formattedIndex}
           </span>
-          <div>
-            <h3 className="font-['Timeless'] text-2xl text-[#111111] font-semibold leading-tight">
+          <div className="min-w-0">
+            <h3 className="font-['Timeless'] text-2xl text-[#111111] font-semibold leading-tight truncate">
               {route.trainName}
             </h3>
             <p className="text-stone-500 font-['Timeless'] text-xs tracking-wide uppercase mt-0.5">
@@ -197,10 +262,16 @@ export default function RouteCard({ route, index, isActive, onSelect }: RoutePro
           </div>
         </div>
 
+        {/* Tentative Fare Range in Rupees: Sleeper to 3 AC (e.g. ₹345–₹1,225) */}
         <div className="text-right flex-shrink-0 font-['Timeless']">
-          <p className="font-['Timeless'] text-2xl text-[#111111] font-bold">{route.fare}</p>
+          <p className="font-['Timeless'] text-xl sm:text-2xl text-[#111111] font-bold tracking-tight">
+            ₹{minFare}–₹{maxFare}
+          </p>
+          <p className="text-[11px] text-stone-500 font-medium font-['Timeless'] leading-tight mt-0.5">
+            Tentative approx. (SL – 3AC)
+          </p>
           {getSimpleLabel(route.label) && (
-            <p className="text-xs text-[#4A5D30] font-semibold mt-0.5 font-['Timeless']">
+            <p className="text-xs text-[#4A5D30] font-semibold mt-1 font-['Timeless']">
               {getSimpleLabel(route.label)}
             </p>
           )}
@@ -270,7 +341,7 @@ export default function RouteCard({ route, index, isActive, onSelect }: RoutePro
         {/* Expand / Collapse Button */}
         <button
           onClick={toggleExpand}
-          className="text-xs font-['Timeless'] text-[#4A5D30] font-medium flex items-center gap-1 hover:underline ml-auto py-1 px-2 rounded-md hover:bg-[#4A5D30]/10 transition-colors cursor-pointer"
+          className="text-xs font-['Timeless'] text-[#4A5D30] font-semibold flex items-center gap-1 hover:underline ml-auto py-1 px-2.5 rounded-md hover:bg-[#4A5D30]/10 transition-colors cursor-pointer"
         >
           {isExpanded ? 'Hide Details' : 'View Details'}
           <svg
@@ -287,50 +358,130 @@ export default function RouteCard({ route, index, isActive, onSelect }: RoutePro
 
       {/* Expanded Details Section */}
       {isExpanded && (
-        <div className="mt-5 pt-5 border-t border-stone-100 flex flex-col gap-4 text-xs font-['Timeless'] animate-fadeIn">
-          {/* Detailed Train Legs */}
+        <div className="mt-5 pt-5 border-t border-stone-200/80 flex flex-col gap-4 text-xs font-['Timeless'] animate-fadeIn">
+          {/* Detailed Train Legs with Full Station Timetable Stops */}
           {route.legs && route.legs.length > 0 && (
             <div className="flex flex-col gap-3 font-['Timeless']">
-              <h4 className="font-['Timeless'] text-xs font-bold tracking-wide uppercase text-stone-500">
-                Train Journey Steps
+              <h4 className="font-['Timeless'] text-xs font-bold tracking-wide uppercase text-stone-600">
+                Train Journey & Station Timetable
               </h4>
-              {route.legs.map((leg, lIdx) => (
-                <div key={lIdx} className="bg-stone-50/80 p-3.5 rounded-xl border border-stone-200/70 font-['Timeless']">
-                  <div className="flex justify-between items-start font-semibold text-stone-900 mb-1.5 font-['Timeless']">
-                    <span className="text-[#4A5D30] font-['Timeless']">
-                      {leg.train_number} — {leg.train_name}
-                    </span>
-                    {leg.fare_estimate && <span>Ticket: ₹{leg.fare_estimate}</span>}
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 text-stone-600">
-                    <div>
-                      <p className="font-medium text-stone-800">
-                        {leg.departure_time?.slice(0, 5)} · {leg.from_station_name} ({leg.from_station})
-                      </p>
-                      <p className="text-[11px] text-stone-500">
-                        Boarding: Platform {(leg.departure_platform || 'PF 1').replace(/PF\s*/i, '')}
-                      </p>
+              {route.legs.map((leg, lIdx) => {
+                const slFare = leg.fare_estimate || 345;
+                const ac3Fare = Math.round((slFare * 3.55) / 5) * 5;
+                const legStops = schedules[leg.train_number] || [];
+                const isLoading = loadingSchedule[leg.train_number];
+
+                return (
+                  <div key={lIdx} className="bg-stone-50/90 p-4 rounded-xl border border-stone-200 font-['Timeless']">
+                    <div className="flex justify-between items-start font-semibold text-stone-900 mb-2 font-['Timeless']">
+                      <span className="text-[#4A5D30] font-bold text-[13px]">
+                        {leg.train_number} — {leg.train_name}
+                      </span>
+                      <span className="text-stone-700 font-medium">
+                        ₹{slFare} (SL) · ₹{ac3Fare} (3A)
+                      </span>
                     </div>
-                    <div className="text-right">
-                      <p className="font-medium text-stone-800">
-                        {leg.arrival_time?.slice(0, 5)} · {leg.to_station_name} ({leg.to_station})
-                      </p>
-                      <p className="text-[11px] text-stone-500">
-                        Arrival: Platform {(leg.arrival_platform || 'PF 2').replace(/PF\s*/i, '')}
-                      </p>
+
+                    <div className="grid grid-cols-2 gap-2 text-stone-600 mb-2">
+                      <div>
+                        <p className="font-semibold text-stone-900">
+                          {leg.departure_time?.slice(0, 5)} · {leg.from_station_name} ({leg.from_station})
+                        </p>
+                        <p className="text-[11px] text-stone-500">
+                          Boarding: Platform {(leg.departure_platform || 'PF 1').replace(/PF\s*/i, '')}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold text-stone-900">
+                          {leg.arrival_time?.slice(0, 5)} · {leg.to_station_name} ({leg.to_station})
+                        </p>
+                        <p className="text-[11px] text-stone-500">
+                          Arrival: Platform {(leg.arrival_platform || 'PF 2').replace(/PF\s*/i, '')}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Complete Station List with Arrival & Leave Timings */}
+                    <div className="mt-3 pt-3 border-t border-stone-200">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-bold text-xs text-stone-800 uppercase tracking-wide">
+                          Station List ({legStops.length > 0 ? `${legStops.length} stops` : 'Scheduled route'})
+                        </span>
+                        <span className="text-[11px] text-stone-500 font-medium">
+                          Arrival · Leave
+                        </span>
+                      </div>
+
+                      {isLoading ? (
+                        <div className="py-3 text-center text-stone-500 text-xs italic">
+                          Loading stations & timings...
+                        </div>
+                      ) : legStops.length > 0 ? (
+                        <div className="flex flex-col gap-1 max-h-[220px] overflow-y-auto pr-1">
+                          {legStops.map((st, sIdx) => {
+                            const isOrigin = sIdx === 0;
+                            const isDest = sIdx === legStops.length - 1;
+                            const arrStr = st.arrival && st.arrival !== 'None' ? st.arrival.slice(0, 5) : 'Starts';
+                            const depStr = st.departure && st.departure !== 'None' ? st.departure.slice(0, 5) : 'Terminates';
+
+                            return (
+                              <div
+                                key={st.station_code || sIdx}
+                                className={`flex items-center justify-between py-1.5 px-2 rounded-lg text-xs transition-colors ${
+                                  isOrigin
+                                    ? 'bg-blue-50/80 border border-blue-200/80 font-semibold'
+                                    : isDest
+                                    ? 'bg-red-50/80 border border-red-200/80 font-semibold'
+                                    : 'hover:bg-stone-100/80'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span
+                                    className={`w-2 h-2 rounded-full shrink-0 ${
+                                      isOrigin
+                                        ? 'bg-[#1A73E8]'
+                                        : isDest
+                                        ? 'bg-[#EA4335]'
+                                        : 'bg-stone-300'
+                                    }`}
+                                  />
+                                  <span className="truncate text-stone-900 font-medium">
+                                    {st.station_name || st.station_code}
+                                  </span>
+                                  <span className="text-[10px] text-stone-400 font-semibold shrink-0">
+                                    ({st.station_code})
+                                  </span>
+                                </div>
+
+                                <div className="text-right text-[11px] font-mono shrink-0 ml-2">
+                                  <span className={isOrigin ? 'text-[#1A73E8] font-bold' : 'text-stone-600'}>
+                                    {arrStr}
+                                  </span>
+                                  <span className="text-stone-300 mx-1.5">→</span>
+                                  <span className={isDest ? 'text-[#EA4335] font-bold' : 'text-stone-900 font-semibold'}>
+                                    {depStr}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="flex flex-col gap-1 text-xs text-stone-700 py-1">
+                          <div className="flex justify-between items-center py-1 px-2 bg-blue-50/80 rounded-lg">
+                            <span className="font-semibold text-stone-900">{leg.from_station_name} ({leg.from_station})</span>
+                            <span className="font-mono text-stone-800">Leaves {leg.departure_time?.slice(0, 5)}</span>
+                          </div>
+                          <div className="flex justify-between items-center py-1 px-2 bg-red-50/80 rounded-lg">
+                            <span className="font-semibold text-stone-900">{leg.to_station_name} ({leg.to_station})</span>
+                            <span className="font-mono text-stone-800">Arrives {leg.arrival_time?.slice(0, 5)}</span>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
-                  {leg.predicted_delay_min > 0 ? (
-                    <p className="mt-2 text-xs text-amber-800 font-medium">
-                      Expected delay: about {leg.predicted_delay_min} minutes
-                    </p>
-                  ) : (
-                    <p className="mt-2 text-xs text-emerald-800 font-medium">
-                      Usually arrives on time
-                    </p>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
@@ -338,7 +489,7 @@ export default function RouteCard({ route, index, isActive, onSelect }: RoutePro
           {route.transfers_info && route.transfers_info.length > 0 && (
             <div className="flex flex-col gap-2">
               {route.transfers_info.map((t, tIdx) => (
-                <div key={tIdx} className="bg-stone-50/80 p-3.5 rounded-xl border border-stone-200/70 text-stone-800 font-['Timeless']">
+                <div key={tIdx} className="bg-stone-50/90 p-3.5 rounded-xl border border-stone-200 text-stone-800 font-['Timeless']">
                   <div className="flex items-center justify-between font-semibold mb-1">
                     <span className="text-[#4A5D30]">Change at {t.station_name} ({t.station_code})</span>
                     <span className="text-stone-600 font-medium text-xs">
@@ -346,11 +497,6 @@ export default function RouteCard({ route, index, isActive, onSelect }: RoutePro
                     </span>
                   </div>
                   <p className="text-stone-600 text-xs leading-relaxed">{t.interchange_guide}</p>
-                  {t.bus_alternatives_count != null && t.bus_alternatives_count > 0 && (
-                    <p className="mt-1 text-xs text-stone-700">
-                      Note: {t.bus_alternatives_count} connecting buses are also available from nearby bus stand
-                    </p>
-                  )}
                 </div>
               ))}
             </div>
@@ -359,11 +505,11 @@ export default function RouteCard({ route, index, isActive, onSelect }: RoutePro
           {/* Multimodal Bus Alternative Legs */}
           {route.bus_legs && route.bus_legs.length > 0 && (
             <div className="flex flex-col gap-2 font-['Timeless']">
-              <h4 className="font-['Timeless'] text-xs font-bold text-stone-500 tracking-wide uppercase">
+              <h4 className="font-['Timeless'] text-xs font-bold text-stone-600 tracking-wide uppercase">
                 {route.legs && route.legs.length > 0 ? 'Connecting Bus Steps' : 'Direct Bus Journey'}
               </h4>
               {route.bus_legs.map((b, bIdx) => (
-                <div key={bIdx} className="bg-stone-50/80 p-3.5 rounded-xl border border-stone-200/70 text-stone-900 font-['Timeless']">
+                <div key={bIdx} className="bg-stone-50/90 p-3.5 rounded-xl border border-stone-200 text-stone-900 font-['Timeless']">
                   <div className="flex justify-between items-start font-semibold mb-1">
                     <span>
                       {b.operator_name} ({b.bus_type})
@@ -373,29 +519,14 @@ export default function RouteCard({ route, index, isActive, onSelect }: RoutePro
                   <p className="text-stone-600 text-xs">
                     {b.from_terminal} ({b.departure_time?.slice(0, 5)}) → {b.to_terminal} ({b.arrival_time?.slice(0, 5)})
                   </p>
-                  <div className="flex items-center gap-2 text-xs text-stone-500 mt-1.5 flex-wrap">
-                    <span>{b.is_ac ? 'Air conditioned bus' : 'Regular bus'}</span>
-                    {b.walk_to_terminal_min && (
-                      <>
-                        <span className="text-stone-300">•</span>
-                        <span>{b.walk_to_terminal_min} min walk from train station</span>
-                      </>
-                    )}
-                    {b.rating && (
-                      <>
-                        <span className="text-stone-300">•</span>
-                        <span>Rating: {b.rating} out of 5</span>
-                      </>
-                    )}
-                  </div>
                 </div>
               ))}
             </div>
           )}
 
-          {/* Helpful Journey Notes: Clean, normal formatting without capsules or emojis */}
+          {/* Helpful Journey Notes */}
           {(route.fare_arbitrage_tip || route.weather_advisory || (route.accessibility_badge && route.accessibility_badge !== 'Standard Route')) && (
-            <div className="mt-2 pt-3 border-t border-stone-200/60 flex flex-col gap-3 font-['Timeless'] text-xs text-stone-700">
+            <div className="mt-2 pt-3 border-t border-stone-200/80 flex flex-col gap-3 font-['Timeless'] text-xs text-stone-700">
               {route.fare_arbitrage_tip && (
                 <div>
                   <p className="font-semibold text-stone-900 mb-0.5">
@@ -414,17 +545,6 @@ export default function RouteCard({ route, index, isActive, onSelect }: RoutePro
                   </p>
                   <p className="text-stone-600 leading-relaxed">
                     {cleanWeatherText(route.weather_advisory)}
-                  </p>
-                </div>
-              )}
-
-              {route.accessibility_badge && route.accessibility_badge !== 'Standard Route' && (
-                <div>
-                  <p className="font-semibold text-stone-900 mb-0.5">
-                    Station facilities:
-                  </p>
-                  <p className="text-stone-600 leading-relaxed">
-                    {route.accessibility_badge}
                   </p>
                 </div>
               )}

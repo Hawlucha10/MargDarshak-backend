@@ -1,6 +1,5 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
-import { MapContainer, TileLayer, Polyline, CircleMarker, Marker, Tooltip, useMap } from 'react-leaflet';
-import L from 'leaflet';
+import { MapContainer, TileLayer, Polyline, CircleMarker, Tooltip, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 
 export interface RouteStation {
@@ -47,6 +46,7 @@ interface Props {
     to_lat?: number | null;
     to_lon?: number | null;
   }>;
+  onOpenRouteDetails?: () => void;
 }
 
 // Distance from point P to segment AB in km
@@ -88,78 +88,34 @@ function MapBoundsUpdater({ coords }: { coords: [number, number][] }) {
   return null;
 }
 
-// Minimalist Google Maps Destination Pin Icon (Classic Red Marker)
-const googleDestPinIcon = L.divIcon({
-  className: 'google-maps-dest-marker',
-  html: `
-    <div style="position: relative; width: 28px; height: 36px; transform: translate(-14px, -36px); cursor: pointer; filter: drop-shadow(0 2px 5px rgba(0,0,0,0.3));">
-      <svg width="28" height="36" viewBox="0 0 24 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M12 0C5.37258 0 0 5.37258 0 12C0 21 12 32 12 32C12 32 24 21 24 12C24 5.37258 18.6274 0 12 0Z" fill="#EA4335" stroke="#FFFFFF" stroke-width="1.2"/>
-        <circle cx="12" cy="11.5" r="4.5" fill="#FFFFFF"/>
-      </svg>
-    </div>
-  `,
-  iconSize: [28, 36],
-  iconAnchor: [14, 36],
-});
-
-// Floating Minimalist Map Controls
-function CustomMapControls({
-  routeCoords,
-  onResetIndia,
-  onFocusRoute,
-}: {
-  routeCoords: [number, number][];
-  onResetIndia: () => void;
-  onFocusRoute: () => void;
-}) {
+// Floating Minimalist Zoom Controls anchored at Bottom-Right (Google Maps style)
+function BottomRightZoomControls() {
   const map = useMap();
 
   return (
-    <div className="absolute top-4 right-4 z-[500] flex flex-col gap-2 font-['Timeless']">
-      <div className="flex flex-col bg-white rounded-xl shadow-md border border-stone-200 overflow-hidden text-stone-800">
-        <button
-          type="button"
-          onClick={() => map.zoomIn()}
-          className="w-8.5 h-8.5 flex items-center justify-center text-stone-700 font-bold text-lg hover:bg-stone-100 transition-colors border-b border-stone-200 cursor-pointer"
-          title="Zoom In"
-        >
-          +
-        </button>
-        <button
-          type="button"
-          onClick={() => map.zoomOut()}
-          className="w-8.5 h-8.5 flex items-center justify-center text-stone-700 font-bold text-lg hover:bg-stone-100 transition-colors cursor-pointer"
-          title="Zoom Out"
-        >
-          −
-        </button>
-      </div>
-
+    <div className="absolute bottom-5 right-4 z-[500] flex flex-col bg-white rounded-lg shadow-md border border-stone-300 overflow-hidden">
       <button
         type="button"
-        onClick={onResetIndia}
-        className="px-3 py-1.5 bg-white hover:bg-stone-50 text-stone-700 rounded-xl shadow-md border border-stone-200 text-xs font-semibold tracking-wide transition-all cursor-pointer"
-        title="View All India"
+        onClick={() => map.zoomIn()}
+        className="w-8.5 h-8.5 flex items-center justify-center text-stone-700 hover:text-black hover:bg-stone-100 font-bold text-xl transition-colors cursor-pointer leading-none select-none"
+        title="Zoom In"
       >
-        Whole India
+        +
       </button>
-
-      {routeCoords.length >= 2 && (
-        <button
-          type="button"
-          onClick={onFocusRoute}
-          className="px-3 py-1.5 bg-[#1A73E8] hover:bg-[#1557B0] text-white rounded-xl shadow-md text-xs font-semibold tracking-wide transition-all cursor-pointer"
-          title="Focus on Active Route"
-        >
-          Focus Route
-        </button>
-      )}
+      <div className="w-full h-[1px] bg-stone-200" />
+      <button
+        type="button"
+        onClick={() => map.zoomOut()}
+        className="w-8.5 h-8.5 flex items-center justify-center text-stone-700 hover:text-black hover:bg-stone-100 font-bold text-xl transition-colors cursor-pointer leading-none select-none"
+        title="Zoom Out"
+      >
+        −
+      </button>
     </div>
   );
 }
 
-export default function RouteMap({ legs = [], busLegs = [] }: Props) {
+export default function RouteMap({ legs = [], busLegs = [], onOpenRouteDetails }: Props) {
   const [stations, setStations] = useState<StationGeo[]>([]);
   const [trainStops, setTrainStops] = useState<Record<string, string[]>>({});
   const mapRef = useRef<L.Map | null>(null);
@@ -189,7 +145,7 @@ export default function RouteMap({ legs = [], busLegs = [] }: Props) {
   }, [stations]);
 
   // Compute ONLY the stations and coordinates for the selected route
-  const { routeStations, trainPolylineCoords, busPolylineCoords, allRouteCoords } = useMemo(() => {
+  const { routeStations, trainPolylineCoords, busPolylineCoords, allRouteCoords, originCoord, destCoord } = useMemo(() => {
     const stationList: RouteStation[] = [];
     const addedCodes = new Set<string>();
     const trainCoords: [number, number][] = [];
@@ -197,7 +153,14 @@ export default function RouteMap({ legs = [], busLegs = [] }: Props) {
     const allCoords: [number, number][] = [];
 
     if (stations.length === 0) {
-      return { routeStations: stationList, trainPolylineCoords: trainCoords, busPolylineCoords: busCoords, allRouteCoords: allCoords };
+      return {
+        routeStations: stationList,
+        trainPolylineCoords: trainCoords,
+        busPolylineCoords: busCoords,
+        allRouteCoords: allCoords,
+        originCoord: null,
+        destCoord: null,
+      };
     }
 
     const findCorridorStations = (
@@ -319,6 +282,15 @@ export default function RouteMap({ legs = [], busLegs = [] }: Props) {
         trainCoords.push([tLat, tLon]);
         allCoords.push([tLat, tLon]);
       }
+
+      // Ensure the exact destination endpoint of the leg is securely linked in the polyline
+      if (legIdx === legs.length - 1 && busLegs.length === 0) {
+        const lastCoord = trainCoords[trainCoords.length - 1];
+        if (!lastCoord || Math.hypot(lastCoord[0] - tLat, lastCoord[1] - tLon) > 0.0005) {
+          trainCoords.push([tLat, tLon]);
+          allCoords.push([tLat, tLon]);
+        }
+      }
     });
 
     // 2. Process Bus Legs
@@ -381,7 +353,29 @@ export default function RouteMap({ legs = [], busLegs = [] }: Props) {
       allCoords.push([tLat, tLon]);
     });
 
-    return { routeStations: stationList, trainPolylineCoords: trainCoords, busPolylineCoords: busCoords, allRouteCoords: allCoords };
+    // Exact Origin and Destination coordinates guaranteed to connect to the polyline ends
+    const origPoint: [number, number] | null =
+      trainCoords.length > 0
+        ? trainCoords[0]
+        : busCoords.length > 0
+        ? busCoords[0]
+        : null;
+
+    const destPoint: [number, number] | null =
+      busCoords.length > 0
+        ? busCoords[busCoords.length - 1]
+        : trainCoords.length > 0
+        ? trainCoords[trainCoords.length - 1]
+        : null;
+
+    return {
+      routeStations: stationList,
+      trainPolylineCoords: trainCoords,
+      busPolylineCoords: busCoords,
+      allRouteCoords: allCoords,
+      originCoord: origPoint,
+      destCoord: destPoint,
+    };
   }, [stations, trainStops, stationMap, legs, busLegs]);
 
   const handleResetIndia = () => {
@@ -396,10 +390,12 @@ export default function RouteMap({ legs = [], busLegs = [] }: Props) {
     }
   };
 
-  // Identify Key Route Endpoints
+  // Identify Key Route Endpoints and Intermediate Stops
   const originStation = routeStations.find((s) => s.routeRole === 'ORIGIN');
   const destStation = routeStations.find((s) => s.routeRole === 'DESTINATION');
-  const intermediateStops = routeStations.filter((s) => s.routeRole !== 'ORIGIN' && s.routeRole !== 'DESTINATION');
+  const intermediateStops = routeStations.filter(
+    (s) => s.routeRole !== 'ORIGIN' && s.routeRole !== 'DESTINATION'
+  );
 
   return (
     <div className="w-full h-full relative overflow-hidden bg-[#F2EFE9] font-['Timeless'] select-none">
@@ -465,7 +461,7 @@ export default function RouteMap({ legs = [], busLegs = [] }: Props) {
           <CircleMarker
             key={st.c}
             center={[st.lat, st.lon]}
-            radius={st.routeRole === 'TRANSFER' ? 5.5 : 4}
+            radius={st.routeRole === 'TRANSFER' ? 5 : 3.8}
             pathOptions={{
               fillColor: '#FFFFFF',
               fillOpacity: 1,
@@ -484,11 +480,11 @@ export default function RouteMap({ legs = [], busLegs = [] }: Props) {
           </CircleMarker>
         ))}
 
-        {/* Origin Station Marker: Google Maps Blue Circle with White Center */}
-        {originStation && (
+        {/* Origin Station Dot: Color 1 (Google Blue #1A73E8) */}
+        {originCoord && (
           <CircleMarker
-            center={[originStation.lat, originStation.lon]}
-            radius={7.5}
+            center={originCoord}
+            radius={7}
             pathOptions={{
               fillColor: '#FFFFFF',
               fillOpacity: 1,
@@ -496,56 +492,86 @@ export default function RouteMap({ legs = [], busLegs = [] }: Props) {
               weight: 3.5,
             }}
           >
-            <Tooltip direction="top" offset={[0, -8]} permanent opacity={0.95}>
-              <div className="font-['Timeless'] text-xs font-bold text-[#1A73E8] bg-white px-2 py-0.5 rounded shadow-sm border border-blue-200">
-                {originStation.n} ({originStation.c})
+            <Tooltip direction="top" offset={[0, -6]} opacity={0.95}>
+              <div className="font-['Timeless'] text-xs font-bold text-[#1A73E8] bg-white px-1.5 py-0.5 rounded shadow-sm">
+                Origin: {originStation?.n || 'Origin Station'} ({originStation?.c || ''})
               </div>
             </Tooltip>
           </CircleMarker>
         )}
 
-        {/* Destination Station Marker: Iconic Google Maps Red Pin */}
-        {destStation && (
-          <Marker
-            position={[destStation.lat, destStation.lon]}
-            icon={googleDestPinIcon}
+        {/* Destination Station Dot: Color 2 (Google Red #EA4335) - Placed directly on polyline terminus */}
+        {destCoord && (
+          <CircleMarker
+            center={destCoord}
+            radius={7}
+            pathOptions={{
+              fillColor: '#FFFFFF',
+              fillOpacity: 1,
+              color: '#EA4335',
+              weight: 3.5,
+            }}
           >
-            <Tooltip direction="top" offset={[0, -36]} permanent opacity={0.95}>
-              <div className="font-['Timeless'] text-xs font-bold text-[#EA4335] bg-white px-2 py-0.5 rounded shadow-sm border border-red-200">
-                {destStation.n} ({destStation.c})
+            <Tooltip direction="top" offset={[0, -6]} opacity={0.95}>
+              <div className="font-['Timeless'] text-xs font-bold text-[#EA4335] bg-white px-1.5 py-0.5 rounded shadow-sm">
+                Destination: {destStation?.n || 'Destination Station'} ({destStation?.c || ''})
               </div>
             </Tooltip>
-          </Marker>
+          </CircleMarker>
         )}
 
-        {/* Floating Controls */}
-        <CustomMapControls
-          routeCoords={allRouteCoords}
-          onResetIndia={handleResetIndia}
-          onFocusRoute={handleFocusRoute}
-        />
+        {/* Google Maps Style Zoom Controls at Bottom Right */}
+        <BottomRightZoomControls />
       </MapContainer>
 
-      {/* Top-Left Minimalist Route Badge */}
+      {/* Top-Right Controls: Whole India & Focus Route */}
+      <div className="absolute top-4 right-4 z-[500] flex items-center gap-2 font-['Timeless']">
+        <button
+          type="button"
+          onClick={handleResetIndia}
+          className="px-3 py-1.5 bg-white hover:bg-stone-50 text-stone-700 rounded-xl shadow-md border border-stone-200 text-xs font-semibold tracking-wide transition-all cursor-pointer"
+          title="View All India"
+        >
+          Whole India
+        </button>
+
+        {allRouteCoords.length >= 2 && (
+          <button
+            type="button"
+            onClick={handleFocusRoute}
+            className="px-3 py-1.5 bg-[#1A73E8] hover:bg-[#1557B0] text-white rounded-xl shadow-md text-xs font-semibold tracking-wide transition-all cursor-pointer"
+            title="Focus on Active Route"
+          >
+            Focus Route
+          </button>
+        )}
+      </div>
+
+      {/* Top-Left Minimalist Route Badge - Clickable to open timetable on route card */}
       {originStation && destStation && (
-        <div className="absolute top-4 left-4 z-[450] bg-white/95 backdrop-blur-md px-3.5 py-2 rounded-xl shadow-md border border-stone-200 text-xs font-['Timeless'] text-stone-800 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onOpenRouteDetails}
+          className="absolute top-4 left-4 z-[450] bg-white hover:bg-stone-50 px-3.5 py-2 rounded-xl shadow-md border border-stone-200 text-xs font-['Timeless'] text-stone-800 flex items-center gap-2 transition-all hover:scale-102 hover:shadow-lg active:scale-98 cursor-pointer group"
+          title="Click to view full station timetable on selected route card"
+        >
           <span className="w-2.5 h-2.5 rounded-full bg-[#1A73E8]" />
-          <span className="font-bold text-[#1A73E8]">
-            {originStation.c}
-          </span>
+          <span className="font-bold text-[#1A73E8]">{originStation.c}</span>
           <span className="text-stone-400">→</span>
-          <span className="font-bold text-[#EA4335]">
-            {destStation.c}
-          </span>
+          <span className="font-bold text-[#EA4335]">{destStation.c}</span>
           <span className="text-stone-300">|</span>
-          <span className="text-stone-600 font-medium">
-            {intermediateStops.length} stops
+          <span className="text-stone-600 font-medium">{intermediateStops.length} stops</span>
+          <span className="text-[11px] text-[#1A73E8] font-bold group-hover:underline flex items-center gap-0.5 ml-0.5">
+            View stops
+            <svg className="w-3 h-3 text-[#1A73E8]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
           </span>
-        </div>
+        </button>
       )}
 
       {/* Bottom-Left Minimalist Legend Bar */}
-      <div className="absolute bottom-4 left-4 z-[450] bg-white/95 backdrop-blur-md px-3.5 py-1.5 rounded-xl shadow-md border border-stone-200 text-xs font-['Timeless'] text-stone-700 flex items-center gap-3">
+      <div className="absolute bottom-5 left-4 z-[450] bg-white/95 backdrop-blur-md px-3.5 py-1.5 rounded-xl shadow-md border border-stone-200 text-xs font-['Timeless'] text-stone-700 flex items-center gap-3">
         <span className="flex items-center gap-1.5 font-medium">
           <span className="w-2.5 h-2.5 rounded-full bg-[#1A73E8] border border-white" /> Origin
         </span>

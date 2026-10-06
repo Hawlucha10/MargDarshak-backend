@@ -95,6 +95,7 @@ export default function ResultsPage() {
   const [loadingMsgIndex, setLoadingMsgIndex] = useState(0);
   const [error, setError] = useState('');
   const [selectedRouteId, setSelectedRouteId] = useState<string>('route-0');
+  const [expandedRouteId, setExpandedRouteId] = useState<string | null>(null);
   const [selectedFilter, setSelectedFilter] = useState<ParetoFilterKey>(() => {
     const p = searchParams.get('priority') || searchParams.get('filter') || 'ALL';
     const upper = p.toUpperCase();
@@ -310,6 +311,36 @@ export default function ResultsPage() {
       arrivalDate = departureDate;
     }
 
+    // Calculate tentative fare range in rupees (Sleeper to 3 AC across all train legs + bus legs)
+    let minFare = 0;
+    let maxFare = 0;
+
+    if (r.legs && r.legs.length > 0) {
+      r.legs.forEach((leg) => {
+        let legSl = leg.fare_estimate || 0;
+        if (!legSl && r.total_fare) {
+          legSl = Math.round(r.total_fare / r.legs.length);
+        }
+        if (!legSl) legSl = 345;
+        const leg3Ac = Math.round((legSl * 3.55) / 5) * 5;
+        minFare += legSl;
+        maxFare += leg3Ac;
+      });
+    }
+
+    if (r.bus_legs && r.bus_legs.length > 0) {
+      r.bus_legs.forEach((b) => {
+        const bFare = b.fare || 150;
+        minFare += bFare;
+        maxFare += bFare;
+      });
+    }
+
+    if (minFare === 0) {
+      minFare = r.total_fare || 345;
+      maxFare = Math.round((minFare * 3.55) / 5) * 5;
+    }
+
     return {
       id: `route-${i}`,
       label: r.label,
@@ -320,7 +351,9 @@ export default function ResultsPage() {
       departureDate,
       arrivalDate,
       duration: computedDuration,
-      fare: r.total_fare ? `₹${r.total_fare}` : '--',
+      fare: `₹${minFare}–₹${maxFare}`,
+      fareMin: minFare,
+      fareMax: maxFare,
       transfers: r.transfers,
       reliability: r.joint_reliability_percent || `${Math.round(r.reliability_score * 100)}%`,
       hasBusLeg: Boolean(r.is_multimodal || (r.bus_legs && r.bus_legs.length > 0)),
@@ -370,8 +403,7 @@ export default function ResultsPage() {
         return getMin(a.duration) - getMin(b.duration);
       }
       if (sortBy === 'fare') {
-        const parseFare = (f: string) => parseInt(f.replace('₹', '')) || 9999;
-        return parseFare(a.fare) - parseFare(b.fare);
+        return (a.fareMin || 0) - (b.fareMin || 0);
       }
       if (sortBy === 'reliability') {
         const parseRel = (rel?: string) => parseInt(rel?.replace('%', '') || '0');
@@ -403,6 +435,15 @@ export default function ResultsPage() {
           <RouteMap
             legs={activeRoute?.legs}
             busLegs={activeRoute?.bus_legs}
+            onOpenRouteDetails={() => {
+              if (selectedRouteId) {
+                setExpandedRouteId(selectedRouteId);
+                const el = document.getElementById(selectedRouteId);
+                if (el) {
+                  el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+              }
+            }}
           />
         </div>
 
@@ -615,7 +656,12 @@ export default function ResultsPage() {
                     route={route}
                     index={i}
                     isActive={selectedRouteId === route.id}
+                    isExpanded={expandedRouteId === route.id}
                     onSelect={() => setSelectedRouteId(route.id)}
+                    onToggleExpand={() => {
+                      setSelectedRouteId(route.id);
+                      setExpandedRouteId((prev) => (prev === route.id ? null : route.id));
+                    }}
                   />
                 ))
               ) : (
