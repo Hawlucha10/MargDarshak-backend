@@ -17,8 +17,8 @@ function AppContent() {
   };
 
   return (
-    <div className="h-screen max-h-screen bg-[#E5D5BF] flex flex-col overflow-hidden relative">
-      <main className="flex-1 flex flex-col overflow-hidden">
+    <div className="h-[100dvh] max-h-[100dvh] w-full bg-[#E5D5BF] flex flex-col overflow-hidden relative">
+      <main className="flex-1 flex flex-col overflow-hidden min-h-0">
         <Routes>
           <Route path="/" element={<SearchPage />} />
           <Route path="/results" element={<ResultsPage />} />

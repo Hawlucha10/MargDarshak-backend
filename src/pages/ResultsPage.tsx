@@ -6,7 +6,7 @@ import ParetoFilterBar, { type ParetoFilterKey, type ParetoFilterCounts } from '
 import { useChat } from '../context/ChatContext';
 import { getRecentSearches, saveRecentSearch, type RecentSearchItem } from '../utils/recentSearches';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE = import.meta.env.VITE_API_URL || '';
 
 interface SearchResponse {
   search_id: string;
@@ -111,6 +111,7 @@ export default function ResultsPage() {
   const [sortBy, setSortBy] = useState<string>('best_match');
   const [clarifyInput, setClarifyInput] = useState('');
   const [recentSearches, setRecentSearches] = useState<RecentSearchItem[]>(() => getRecentSearches());
+  const [mobileTab, setMobileTab] = useState<'list' | 'map'>('list');
 
   useEffect(() => {
     const handleUpdate = () => setRecentSearches(getRecentSearches());
@@ -218,81 +219,124 @@ export default function ResultsPage() {
   }, [results, selectedRouteId]);
 
   const routeCards: RouteItem[] = (results?.routes || []).map((r, i) => {
-    const hasTrains = Boolean(r.legs && r.legs.length > 0);
-    const hasBuses = Boolean(r.bus_legs && r.bus_legs.length > 0);
-    const firstLeg = hasTrains ? r.legs[0] : null;
-    const lastLeg = hasTrains ? r.legs[r.legs.length - 1] : null;
-    const firstBus = (r.bus_legs && r.bus_legs.length > 0) ? r.bus_legs[0] : null;
-    const lastBus = (r.bus_legs && r.bus_legs.length > 0) ? r.bus_legs[r.bus_legs.length - 1] : null;
+    // Unified chronological legs list:
+    type RouteLegSummary = {
+      type: 'train' | 'bus';
+      fromStation: string;
+      toStation: string;
+      departureTime: string;
+      arrivalTime: string;
+      durationMinutes: number;
+      name: string;
+      identifier: string;
+      operatorOrNumber: string;
+    };
 
-    let computedName = 'Train Connection';
-    if (hasTrains && hasBuses) {
-      computedName = `${firstLeg?.train_name || 'Express Train'} + Express Bus`;
-    } else if (hasTrains) {
-      computedName = firstLeg?.train_name || 'Train Connection';
-    } else if (hasBuses) {
-      computedName = `${firstBus?.operator_name || 'State Highway'} (${firstBus?.bus_type || 'Bus'})`;
-    }
-
-    let computedNumber = '';
-    if (hasTrains && hasBuses) {
-      computedNumber = `${r.legs.map((l) => l.train_number).join(' → ')} + BUS (${firstBus?.operator_code || 'EXPR'})`;
-    } else if (hasTrains) {
-      computedNumber = r.legs.map((l) => l.train_number).join(' → ');
-    } else if (hasBuses) {
-      computedNumber = `BUS // ${firstBus?.operator_code || 'HIGHWAY'}`;
-    }
-
-    const computedDeparture = (r.departure_time || firstLeg?.departure_time || firstBus?.departure_time || '--:--').slice(0, 5);
-
-    // Accurate arrival time resolution:
-    let computedArrival: string = r.arrival_time?.slice(0, 5) || '';
-    if (!computedArrival) {
-      if (hasTrains && hasBuses) {
-        if (results?.destination && lastLeg?.to_station === results.destination) {
-          computedArrival = (lastLeg?.arrival_time || '--:--').slice(0, 5);
-        } else if (results?.destination && lastBus?.to_station_code === results.destination) {
-          computedArrival = (lastBus?.arrival_time || '--:--').slice(0, 5);
-        } else {
-          const lastTransfer = r.transfers_info && r.transfers_info[r.transfers_info.length - 1];
-          if (lastTransfer && lastTransfer.interchange_guide?.includes('Board Train')) {
-            computedArrival = (lastLeg?.arrival_time || lastBus?.arrival_time || '--:--').slice(0, 5);
-          } else {
-            computedArrival = (lastBus?.arrival_time || lastLeg?.arrival_time || '--:--').slice(0, 5);
-          }
-        }
-      } else if (hasTrains) {
-        computedArrival = (lastLeg?.arrival_time || '--:--').slice(0, 5);
-      } else if (hasBuses) {
-        computedArrival = (lastBus?.arrival_time || '--:--').slice(0, 5);
-      } else {
-        computedArrival = '--:--';
-      }
-    }
-    if (!computedArrival) {
-      computedArrival = '--:--';
-    }
-
-    // Accurate total duration calculation:
-    // Sum of all train leg durations + bus leg durations + transfer layovers
-    let totalMins = 0;
+    const orderedLegs: RouteLegSummary[] = [];
     if (r.legs) {
-      for (const leg of r.legs) {
-        const dM = timeStrToMinutes(leg.departure_time);
-        const aM = timeStrToMinutes(leg.arrival_time);
-        const diff = aM >= dM ? aM - dM : aM - dM + 1440;
-        totalMins += Math.max(10, diff);
-      }
+      r.legs.forEach((l) => {
+        const dM = timeStrToMinutes(l.departure_time);
+        const aM = timeStrToMinutes(l.arrival_time);
+        let diff = aM - dM;
+        if (diff < 0) diff += 1440;
+        orderedLegs.push({
+          type: 'train',
+          fromStation: (l.from_station || '').trim().toUpperCase(),
+          toStation: (l.to_station || '').trim().toUpperCase(),
+          departureTime: l.departure_time || '08:00',
+          arrivalTime: l.arrival_time || '18:00',
+          durationMinutes: Math.max(15, diff),
+          name: l.train_name || `Train ${l.train_number}`,
+          identifier: l.train_number || 'Train',
+          operatorOrNumber: l.train_number,
+        });
+      });
     }
     if (r.bus_legs) {
-      for (const b of r.bus_legs) {
-        totalMins += b.duration_minutes || 180;
+      r.bus_legs.forEach((b) => {
+        orderedLegs.push({
+          type: 'bus',
+          fromStation: (b.from_station_code || '').trim().toUpperCase(),
+          toStation: (b.to_station_code || '').trim().toUpperCase(),
+          departureTime: b.departure_time || '08:00',
+          arrivalTime: b.arrival_time || '12:00',
+          durationMinutes: b.duration_minutes || 180,
+          name: `${b.operator_name} (${b.bus_type})`,
+          identifier: `BUS (${b.operator_code || 'EXPR'})`,
+          operatorOrNumber: `BUS // ${b.operator_code || 'EXPR'}`,
+        });
+      });
+    }
+
+    // Sequence chaining: Sort legs so the initial boarding leg comes first (matching origin or chaining aTo -> bFrom)
+    if (orderedLegs.length > 1) {
+      const origCode = (results?.origin || '').trim().toUpperCase();
+      orderedLegs.sort((a, b) => {
+        if (origCode && a.fromStation === origCode && b.fromStation !== origCode) return -1;
+        if (origCode && b.fromStation === origCode && a.fromStation !== origCode) return 1;
+        if (a.toStation === b.fromStation) return -1;
+        if (b.toStation === a.fromStation) return 1;
+        const mA = timeStrToMinutes(a.departureTime);
+        const mB = timeStrToMinutes(b.departureTime);
+        return mA - mB;
+      });
+    }
+
+    // Display title & train/bus identifiers respecting first leg first
+    let computedName = 'Train Connection';
+    let computedNumber = '';
+    if (orderedLegs.length > 0) {
+      if (orderedLegs.length === 1) {
+        computedName = orderedLegs[0].name;
+        computedNumber = orderedLegs[0].identifier;
+      } else {
+        // First leg first, then second leg (e.g. Bus first if bus starts the journey)
+        computedName = `${orderedLegs[0].name} + ${orderedLegs[1].name}`;
+        computedNumber = orderedLegs.map((l) => l.identifier).join(' → ');
       }
     }
-    if (r.transfers_info) {
-      for (const t of r.transfers_info) {
-        totalMins += t.wait_time_minutes || 0;
+
+    // Departure is strictly the first leg's departure; Arrival is strictly the final leg's arrival
+    const computedDeparture = (
+      orderedLegs.length > 0
+        ? orderedLegs[0].departureTime
+        : (r.departure_time || '--:--')
+    ).slice(0, 5);
+
+    const computedArrival = (
+      orderedLegs.length > 0
+        ? orderedLegs[orderedLegs.length - 1].arrivalTime
+        : (r.arrival_time || '--:--')
+    ).slice(0, 5);
+
+    // Accurate total duration calculation:
+    // Total total duration = Sum of all leg travel times + all waiting halt / layover times between consecutive legs
+    let totalMins = 0;
+    for (let idx = 0; idx < orderedLegs.length; idx++) {
+      totalMins += orderedLegs[idx].durationMinutes;
+
+      // Add waiting halt time before the next connecting leg
+      if (idx < orderedLegs.length - 1) {
+        const curArrM = timeStrToMinutes(orderedLegs[idx].arrivalTime);
+        const nextDepM = timeStrToMinutes(orderedLegs[idx + 1].departureTime);
+        let haltM = nextDepM - curArrM;
+        if (haltM < 0) haltM += 1440;
+
+        // Ensure we respect transfer buffer if transfers_info specifies a larger safety buffer
+        const matchingTransfer = r.transfers_info?.find(
+          (t) => t.station_code === orderedLegs[idx].toStation
+        ) || (r.transfers_info && r.transfers_info[idx]);
+        if (matchingTransfer && matchingTransfer.wait_time_minutes > haltM) {
+          haltM = matchingTransfer.wait_time_minutes;
+        }
+
+        totalMins += haltM;
       }
+    }
+
+    // If backend provided a total_travel_minutes that is larger (e.g. multi-day long distance runs), respect it
+    if (r.total_travel_minutes && r.total_travel_minutes > totalMins) {
+      totalMins = r.total_travel_minutes;
     }
 
     const computedDuration = totalMins > 0
@@ -378,7 +422,7 @@ export default function ResultsPage() {
     BALANCED: routeCards.filter((r) => r.label === 'BALANCED').length,
     MOST_RELIABLE: routeCards.filter((r) => r.label === 'MOST_RELIABLE').length,
     COMFORT_HOMESTAY: routeCards.filter((r) => r.label === 'COMFORT_HOMESTAY').length,
-    MULTIMODAL: routeCards.filter((r) => r.isMultimodal || r.hasBusLeg || r.label === 'MULTIMODAL_FASTEST').length,
+    MULTIMODAL: routeCards.filter((r) => r.isMultimodal || r.hasBusLeg || r.label === 'MULTIMODAL_FASTEST' || r.label === 'MULTIMODAL' || (r.bus_legs && r.bus_legs.length > 0)).length,
   }), [routeCards]);
 
   const displayedRouteCards = useMemo(() => {
@@ -390,7 +434,7 @@ export default function ResultsPage() {
       if (selectedFilter === 'BALANCED') return r.label === 'BALANCED';
       if (selectedFilter === 'MOST_RELIABLE') return r.label === 'MOST_RELIABLE';
       if (selectedFilter === 'COMFORT_HOMESTAY') return r.label === 'COMFORT_HOMESTAY';
-      if (selectedFilter === 'MULTIMODAL') return r.isMultimodal || r.hasBusLeg || r.label === 'MULTIMODAL_FASTEST';
+      if (selectedFilter === 'MULTIMODAL') return r.isMultimodal || r.hasBusLeg || r.label === 'MULTIMODAL_FASTEST' || r.label === 'MULTIMODAL' || (r.bus_legs && r.bus_legs.length > 0);
       return true;
     });
 
@@ -430,14 +474,17 @@ export default function ResultsPage() {
     <div className="h-screen w-screen flex flex-col overflow-hidden bg-[#E5D5BF] font-['Timeless']">
       {/* Main Content Area: 40% Map / 60% Details Split */}
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
-        {/* Map Area: 40% Width on desktop */}
-        <div className="w-full md:w-[40%] h-[40vh] md:h-full relative z-0 flex-shrink-0 border-r border-[#4A5D30]/20">
+        {/* Map Area: 40% Width on desktop, responsive full-height tab on mobile */}
+        <div className={`w-full md:w-[40%] md:h-full relative z-0 flex-shrink-0 border-r border-[#4A5D30]/20 ${
+          mobileTab === 'map' ? 'h-full flex-1' : 'hidden md:block'
+        }`}>
           <RouteMap
             legs={activeRoute?.legs}
             busLegs={activeRoute?.bus_legs}
             onOpenRouteDetails={() => {
               if (selectedRouteId) {
                 setExpandedRouteId(selectedRouteId);
+                setMobileTab('list');
                 const el = document.getElementById(selectedRouteId);
                 if (el) {
                   el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -447,8 +494,10 @@ export default function ResultsPage() {
           />
         </div>
 
-        {/* Route & NLP Response Area: 60% Width on desktop */}
-        <div className="w-full md:w-[60%] h-[60vh] md:h-full overflow-y-auto bg-[#E5D5BF] p-5 sm:p-7 md:p-8 flex flex-col shadow-inner font-['Timeless']">
+        {/* Route & NLP Response Area: 60% Width on desktop, responsive full-height tab on mobile */}
+        <div className={`w-full md:w-[60%] md:h-full overflow-y-auto bg-[#E5D5BF] p-5 sm:p-7 md:p-8 flex flex-col shadow-inner font-['Timeless'] ${
+          mobileTab === 'list' ? 'h-full flex-1' : 'hidden md:flex'
+        }`}>
           {/* Header with Title and Query Metrics */}
           <div className="mb-4 pt-1 font-['Timeless']">
             <div className="flex items-center justify-between flex-wrap gap-2">
@@ -664,30 +713,191 @@ export default function ResultsPage() {
                     }}
                   />
                 ))
+              ) : routeCards.length > 0 ? (
+                <>
+                  <div className="bg-[#F6F0E6] rounded-2xl p-5 text-center border border-[#4A5D30]/20 shadow-xs font-['Timeless'] mb-2">
+                    <p className="font-['Timeless'] text-sm sm:text-base font-bold text-[#4A5D30] mb-1">
+                      No routes match the &ldquo;{selectedFilter.replace(/_/g, ' ')}&rdquo; filter on this corridor.
+                    </p>
+                    <p className="text-xs text-stone-600 mb-3 font-['Timeless']">
+                      Showing all {routeCards.length} available direct & connecting options below:
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedFilter('ALL');
+                        if (routeCards.length > 0) setSelectedRouteId(routeCards[0].id);
+                      }}
+                      className="bg-[#4A5D30] hover:bg-[#3D4C27] text-[#F6F0E6] font-['Timeless'] px-4 py-1.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+                    >
+                      Reset Filter to All Routes
+                    </button>
+                  </div>
+                  {routeCards.map((route, i) => (
+                    <RouteCard
+                      key={route.id}
+                      route={route}
+                      index={i}
+                      isActive={selectedRouteId === route.id}
+                      isExpanded={expandedRouteId === route.id}
+                      onSelect={() => setSelectedRouteId(route.id)}
+                      onToggleExpand={() => {
+                        setSelectedRouteId(route.id);
+                        setExpandedRouteId((prev) => (prev === route.id ? null : route.id));
+                      }}
+                    />
+                  ))}
+                </>
               ) : (
-                <div className="bg-[#F6F0E6] rounded-2xl p-6 text-center border border-[#4A5D30]/20 shadow-xs font-['Timeless']">
-                  <p className="font-['Timeless'] text-base font-bold text-[#4A5D30] mb-1">
-                    No routes found matching filter &ldquo;{selectedFilter.replace(/_/g, ' ')}&rdquo;
-                  </p>
-                  <p className="text-xs text-stone-600 mb-4 font-['Timeless']">
-                    Try switching back to All Routes or another filter.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedFilter('ALL');
-                      if (routeCards.length > 0) setSelectedRouteId(routeCards[0].id);
-                    }}
-                    className="bg-[#4A5D30] hover:bg-[#3D4C27] text-[#F6F0E6] font-['Timeless'] px-4 py-2 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
-                  >
-                    View All {routeCards.length} Available Routes
-                  </button>
+                /* Total 0 routes found for corridor on this date: Intelligent suggestion card */
+                <div className="bg-[#F6F0E6] rounded-2xl p-6 sm:p-7 border border-[#4A5D30]/20 shadow-sm font-['Timeless'] animate-fadeIn">
+                  <div className="flex items-start gap-3.5 mb-4">
+                    <div className="w-10 h-10 rounded-xl bg-[#E5D5BF] border border-[#4A5D30]/25 flex items-center justify-center text-[#4A5D30] shrink-0">
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-[#4A5D30]">
+                        No direct or 2-hop routes found for this corridor on {results?.travel_date || 'this date'}
+                      </h3>
+                      <p className="text-xs sm:text-sm text-stone-600 mt-1 leading-relaxed">
+                        Many Indian Railways trains run on tri-weekly or alternate day schedules. Try checking tomorrow, or connect via a major junction hub below.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Quick Action: Search Next Day or Ask AI */}
+                  <div className="flex flex-wrap items-center gap-3 pt-2 pb-4 border-b border-[#4A5D30]/15">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const curDate = results?.travel_date || new Date().toISOString().split('T')[0];
+                        const d = new Date(curDate);
+                        d.setDate(d.getDate() + 1);
+                        const nextDateStr = d.toISOString().split('T')[0];
+                        const orig = results?.origin || searchParams.get('origin') || '';
+                        const dest = results?.destination || searchParams.get('destination') || '';
+                        navigate(`/results?origin=${encodeURIComponent(orig)}&destination=${encodeURIComponent(dest)}&date=${encodeURIComponent(nextDateStr)}`);
+                      }}
+                      className="bg-[#4A5D30] hover:bg-[#3D4C27] text-[#FAF7F2] px-4 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      <span>Check Next Day (+1 Day)</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={toggleChat}
+                      className="bg-[#FAF7F2] hover:bg-[#E5D5BF] border border-[#4A5D30]/30 text-[#4A5D30] px-4 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer active:scale-95"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                      </svg>
+                      <span>Ask MargDarshak AI</span>
+                    </button>
+                  </div>
+
+                  {/* Major Connecting Railway Hubs */}
+                  <div className="pt-4">
+                    <p className="text-xs font-bold uppercase tracking-wider text-[#4A5D30] mb-2.5">
+                      Suggested Major Interchange Hubs
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                      {[
+                        { code: 'BPL', name: 'Bhopal Jn' },
+                        { code: 'ET', name: 'Itarsi Jn' },
+                        { code: 'NDLS', name: 'New Delhi' },
+                        { code: 'BRC', name: 'Vadodara Jn' },
+                        { code: 'PUNE', name: 'Pune Jn' },
+                        { code: 'JHS', name: 'VGL Jhansi' },
+                        { code: 'CNB', name: 'Kanpur Central' },
+                      ]
+                        .filter(
+                          (h) =>
+                            h.code !== (results?.origin || '').toUpperCase() &&
+                            h.code !== (results?.destination || '').toUpperCase()
+                        )
+                        .slice(0, 4)
+                        .map((hub) => {
+                          const orig = results?.origin || searchParams.get('origin') || '';
+                          const dest = results?.destination || searchParams.get('destination') || '';
+                          const curDate = results?.travel_date || '';
+                          return (
+                            <div
+                              key={hub.code}
+                              className="bg-[#FAF7F2] p-3 rounded-xl border border-[#4A5D30]/20 flex flex-col justify-between gap-2"
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="font-semibold text-stone-900 text-xs truncate">{hub.name}</span>
+                                <span className="text-[#4A5D30] font-bold text-xs shrink-0">({hub.code})</span>
+                              </div>
+                              <div className="flex gap-1.5 text-[11px]">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    navigate(
+                                      `/results?origin=${encodeURIComponent(orig)}&destination=${encodeURIComponent(hub.code)}&date=${encodeURIComponent(curDate)}`
+                                    )
+                                  }
+                                  className="flex-1 bg-[#E5D5BF]/50 hover:bg-[#E5D5BF] text-[#4A5D30] py-1 px-1.5 rounded-md text-center font-medium transition-colors truncate cursor-pointer"
+                                  title={`Search ${orig} to ${hub.code}`}
+                                >
+                                  {orig} → {hub.code}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    navigate(
+                                      `/results?origin=${encodeURIComponent(hub.code)}&destination=${encodeURIComponent(dest)}&date=${encodeURIComponent(curDate)}`
+                                    )
+                                  }
+                                  className="flex-1 bg-[#E5D5BF]/50 hover:bg-[#E5D5BF] text-[#4A5D30] py-1 px-1.5 rounded-md text-center font-medium transition-colors truncate cursor-pointer"
+                                  title={`Search ${hub.code} to ${dest}`}
+                                >
+                                  {hub.code} → {dest}
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
           )}
         </div>
       </div>
+
+      {/* Mobile Floating Pill Toggle (Map / List) - Only visible on small screens (< md) */}
+      {!loading && !error && (
+        <div className="md:hidden fixed bottom-18 left-1/2 -translate-x-1/2 z-30 pointer-events-auto">
+          <button
+            type="button"
+            onClick={() => setMobileTab((prev) => (prev === 'list' ? 'map' : 'list'))}
+            className="bg-[#111111] hover:bg-[#222222] text-[#FAF7F2] px-5 py-2.5 rounded-full shadow-2xl flex items-center gap-2 text-xs font-semibold uppercase tracking-wider border border-white/20 active:scale-95 transition-all cursor-pointer"
+          >
+            {mobileTab === 'list' ? (
+              <>
+                <svg className="w-4 h-4 text-[#E5D5BF]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                </svg>
+                <span>View Map</span>
+              </>
+            ) : (
+              <>
+                <svg className="w-4 h-4 text-[#E5D5BF]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                </svg>
+                <span>View Routes ({displayedRouteCards.length})</span>
+              </>
+            )}
+          </button>
+        </div>
+      )}
 
       {/* Inverted Architectural Bottom Strip (Page 1 footer with inverted colors: light cream bg, dark green text & logo) */}
       <footer className="w-full bg-[#F6F0E6] border-t border-[#4A5D30]/25 py-3.5 px-6 sm:px-10 flex items-center justify-between shrink-0 z-20 shadow-md">
@@ -714,8 +924,8 @@ export default function ResultsPage() {
           </button>
         </div>
 
-        {/* Slogan naturally positioned at bottom right */}
-        <div className="flex-1 flex justify-end items-center">
+        {/* Slogan naturally positioned at bottom right - hidden on phone screens to avoid congestion */}
+        <div className="hidden md:flex flex-1 justify-end items-center">
           <p
             className="text-[#4A5D30]/90 text-[16px] sm:text-[18px] tracking-wide font-normal select-none"
             style={{ fontFamily: "'OFLGoudyStM', Georgia, serif" }}

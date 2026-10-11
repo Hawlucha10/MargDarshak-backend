@@ -1,0 +1,10 @@
+{
+  "appId": "com.margdarshak.app",
+  "appName": "MargDarshak",
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https",
+    "cleartext": true
+  }
+}

@@ -13,7 +13,7 @@ const DYNAMIC_PLACEHOLDERS = [
   'Chandigarh se Amritsar dopahar mein...',
 ];
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE = import.meta.env.VITE_API_URL || '';
 
 export default function SearchBar() {
   const [originCode, setOriginCode] = useState('');
@@ -166,10 +166,10 @@ export default function SearchBar() {
   return (
     <form
       onSubmit={handleSearch}
-      className="bg-[#F6F0E6] p-5 sm:p-6 rounded-2xl sm:rounded-3xl shadow-[0_12px_36px_rgba(74,93,48,0.12)] border border-[#4A5D30]/20 w-full transition-all font-['OFLGoudyStM'] backdrop-blur-sm"
+      className="bg-[#F6F0E6] p-4 sm:p-6 rounded-2xl sm:rounded-3xl shadow-[0_12px_36px_rgba(74,93,48,0.12)] border border-[#4A5D30]/20 w-full transition-all font-['OFLGoudyStM'] backdrop-blur-sm"
     >
       {/* Mode Toggle: Symmetrical equal width boxes (exact same size for both options) */}
-      <div className="flex justify-center mb-4">
+      <div className="flex justify-center mb-2.5 sm:mb-4">
         <div className="inline-flex items-center bg-[#E5D5BF]/75 p-1 rounded-full border border-[#4A5D30]/20 shadow-inner w-full max-w-[370px]">
           <button
             type="button"
@@ -445,7 +445,7 @@ export default function SearchBar() {
 
       {/* Recent Searches Quick Suggestions (Last 2 cached searches) */}
       {recentSearches.length > 0 && (
-        <div className="mt-3 flex items-center justify-center gap-2 flex-wrap font-['Timeless'] text-xs">
+        <div className="mt-2.5 hidden sm:flex items-center justify-center gap-2 flex-wrap font-['Timeless'] text-xs">
           <span className="text-stone-600 font-medium font-['OFLGoudyStM']">Recent:</span>
           {recentSearches.map((item) => (
             <button

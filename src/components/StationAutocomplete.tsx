@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE = import.meta.env.VITE_API_URL || '';
 
 interface StationSuggestion {
   code: string;
@@ -18,6 +18,7 @@ interface Props {
 export default function StationAutocomplete({ value, onChange, placeholder, disabled = false }: Props) {
   const [query, setQuery] = useState(value);
   const [suggestions, setSuggestions] = useState<StationSuggestion[]>([]);
+  const [isPopular, setIsPopular] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const [selectedName, setSelectedName] = useState('');
@@ -31,22 +32,42 @@ export default function StationAutocomplete({ value, onChange, placeholder, disa
   }, [value]);
 
   const fetchSuggestions = useCallback(async (q: string) => {
-    if (q.length < 2) {
+    const clean = q.trim();
+    if (!clean) {
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/stations/popular?limit=8`);
+        if (res.ok) {
+          const data = await res.json();
+          const list = Array.isArray(data) ? data.slice(0, 8) : [];
+          setSuggestions(list);
+          setIsPopular(true);
+          setActiveIndex(-1);
+          setIsOpen(list.length > 0);
+        }
+      } catch {
+        setSuggestions([]);
+        setActiveIndex(-1);
+      }
+      return;
+    }
+    if (clean.length < 2) {
       setSuggestions([]);
+      setIsPopular(false);
       setActiveIndex(-1);
       return;
     }
     try {
-      const res = await fetch(`${API_BASE}/api/v1/stations/autocomplete?q=${encodeURIComponent(q)}`);
+      const res = await fetch(`${API_BASE}/api/v1/stations/autocomplete?q=${encodeURIComponent(clean)}`);
       if (res.ok) {
         const data = await res.json();
         const list = Array.isArray(data) ? data.slice(0, 8) : [];
         setSuggestions(list);
+        setIsPopular(false);
         setActiveIndex(-1);
         setIsOpen(list.length > 0);
 
         // Auto-match if user typed exact station code
-        const exact = list.find((s: StationSuggestion) => s.code.toUpperCase() === q.trim().toUpperCase());
+        const exact = list.find((s: StationSuggestion) => s.code.toUpperCase() === clean.toUpperCase());
         if (exact) {
           onChange(exact.code, exact.name);
         }
@@ -96,9 +117,9 @@ export default function StationAutocomplete({ value, onChange, placeholder, disa
   };
 
   const handleBlur = () => {
-    // If user clicked or typed a station and moved focus, auto-resolve if unconfirmed
+    // If user typed a station and moved focus, auto-resolve if unconfirmed
     setTimeout(() => {
-      if (!selectedName && suggestions.length > 0 && query.trim()) {
+      if (!selectedName && !isPopular && suggestions.length > 0 && query.trim()) {
         const qUpper = query.trim().toUpperCase();
         const match = suggestions.find((s) => s.code.toUpperCase() === qUpper || s.name.toUpperCase() === qUpper) || suggestions[0];
         handleSelect(match);
@@ -141,7 +162,16 @@ export default function StationAutocomplete({ value, onChange, placeholder, disa
         disabled={disabled}
         value={query}
         onChange={(e) => { setQuery(e.target.value); setSelectedName(''); }}
-        onFocus={() => !disabled && suggestions.length > 0 && setIsOpen(true)}
+        onFocus={() => {
+          if (disabled) return;
+          if (!query || query.trim().length === 0) {
+            fetchSuggestions('');
+          } else if (suggestions.length > 0) {
+            setIsOpen(true);
+          } else {
+            fetchSuggestions(query);
+          }
+        }}
         onBlur={handleBlur}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
@@ -150,8 +180,14 @@ export default function StationAutocomplete({ value, onChange, placeholder, disa
       {isOpen && suggestions.length > 0 && (
         <div
           ref={listRef}
-          className="absolute z-50 top-full mt-1.5 w-full bg-[#F6F0E6] rounded-2xl shadow-xl border border-[#4A5D30]/20 overflow-hidden max-h-60 overflow-y-auto font-['Timeless']"
+          className="absolute z-50 top-full mt-1.5 w-full bg-[#F6F0E6] rounded-2xl shadow-xl border border-[#4A5D30]/20 overflow-hidden max-h-64 overflow-y-auto font-['Timeless']"
         >
+          {isPopular && (
+            <div className="px-4 py-1.5 text-xs font-semibold text-[#4A5D30]/80 bg-[#E5D5BF]/50 border-b border-[#4A5D30]/15 flex items-center justify-between">
+              <span>Popular Railway Hubs</span>
+              <span className="text-[11px] text-stone-500 font-normal">Click to select</span>
+            </div>
+          )}
           {suggestions.map((s, idx) => {
             const isHighlighted = idx === activeIndex;
             return (
