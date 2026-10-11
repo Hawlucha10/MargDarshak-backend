@@ -74,6 +74,21 @@ function distancePointToSegmentKm(
   return { distKm: Math.sqrt(dLat * dLat + dLon * dLon), t };
 }
 
+// Great-circle Haversine distance in kilometers
+function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
 // Map Bounds Controller to smoothly focus the active route
 function MapBoundsUpdater({ coords }: { coords: [number, number][] }) {
   const map = useMap();
@@ -200,17 +215,60 @@ export default function RouteMap({ legs = [], busLegs = [], onOpenRouteDetails }
       let timetableStops: StationGeo[] = [];
 
       if (stops && stops.length > 0) {
-        const fromIdx = stops.indexOf(fromCode);
-        const toIdx = stops.indexOf(toCode);
-        if (fromIdx >= 0 && toIdx >= 0) {
-          const minIdx = Math.min(fromIdx, toIdx);
-          const maxIdx = Math.max(fromIdx, toIdx);
-          const subStops = stops.slice(minIdx, maxIdx + 1);
-          if (fromIdx > toIdx) subStops.reverse();
+        const fromIndices: number[] = [];
+        const toIndices: number[] = [];
+        stops.forEach((c, idx) => {
+          if (c === fromCode) fromIndices.push(idx);
+          if (c === toCode) toIndices.push(idx);
+        });
 
-          timetableStops = subStops
-            .map((code) => stationMap.get(code))
-            .filter((s): s is StationGeo => s != null);
+        if (fromIndices.length > 0 && toIndices.length > 0) {
+          type CandidateSlice = {
+            sub: string[];
+            dist: number;
+            hasDups: boolean;
+            isForward: boolean;
+          };
+          const candidates: CandidateSlice[] = [];
+
+          const calcPathDist = (stCodes: string[]) => {
+            let total = 0;
+            for (let k = 0; k < stCodes.length - 1; k++) {
+              const s1 = stationMap.get(stCodes[k]);
+              const s2 = stationMap.get(stCodes[k + 1]);
+              if (s1 && s2) {
+                total += haversineKm(s1.lat, s1.lon, s2.lat, s2.lon);
+              }
+            }
+            return total;
+          };
+
+          for (const fi of fromIndices) {
+            for (const ti of toIndices) {
+              const isForward = fi <= ti;
+              const rawSub = isForward ? stops.slice(fi, ti + 1) : stops.slice(ti, fi + 1).reverse();
+              const hasDups = new Set(rawSub).size !== rawSub.length;
+              const dist = calcPathDist(rawSub);
+              candidates.push({ sub: rawSub, dist, hasDups, isForward });
+            }
+          }
+
+          // Prioritize: zero internal duplicate stations, forward sequence, minimal path distance
+          candidates.sort((a, b) => {
+            if (a.hasDups !== b.hasDups) return a.hasDups ? 1 : -1;
+            if (a.isForward !== b.isForward) return a.isForward ? -1 : 1;
+            return a.dist - b.dist;
+          });
+
+          const best = candidates[0];
+          const directDist = haversineKm(fLat, fLon, tLat, tLon);
+
+          // Only accept timetable slice if it doesn't do an extreme geographic detour
+          if (best && (directDist < 100 || best.dist <= directDist * 2.8 || !best.hasDups)) {
+            timetableStops = best.sub
+              .map((code) => stationMap.get(code))
+              .filter((s): s is StationGeo => s != null);
+          }
         }
       }
 
@@ -560,7 +618,7 @@ export default function RouteMap({ legs = [], busLegs = [], onOpenRouteDetails }
           <span className="text-stone-400">→</span>
           <span className="font-bold text-[#EA4335]">{destStation.c}</span>
           <span className="text-stone-300">|</span>
-          <span className="text-stone-600 font-medium">{intermediateStops.length} stops</span>
+          <span className="text-stone-600 font-medium">{routeStations.length} stops ({intermediateStops.length} intermediate)</span>
           <span className="text-[11px] text-[#1A73E8] font-bold group-hover:underline flex items-center gap-0.5 ml-0.5">
             View stops
             <svg className="w-3 h-3 text-[#1A73E8]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
