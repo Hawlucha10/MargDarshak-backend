@@ -49,30 +49,6 @@ interface Props {
   onOpenRouteDetails?: () => void;
 }
 
-// Distance from point P to segment AB in km
-function distancePointToSegmentKm(
-  pLat: number,
-  pLon: number,
-  aLat: number,
-  aLon: number,
-  bLat: number,
-  bLon: number
-): { distKm: number; t: number } {
-  const dx = bLon - aLon;
-  const dy = bLat - aLat;
-  const l2 = dx * dx + dy * dy;
-  if (l2 === 0) {
-    const dLat = (pLat - aLat) * 111;
-    const dLon = (pLon - aLon) * 85;
-    return { distKm: Math.sqrt(dLat * dLat + dLon * dLon), t: 0 };
-  }
-  const t = Math.max(0, Math.min(1, ((pLon - aLon) * dx + (pLat - aLat) * dy) / l2));
-  const projLon = aLon + t * dx;
-  const projLat = aLat + t * dy;
-  const dLat = (pLat - projLat) * 111;
-  const dLon = (pLon - projLon) * 85;
-  return { distKm: Math.sqrt(dLat * dLat + dLon * dLon), t };
-}
 
 // Great-circle Haversine distance in kilometers
 function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -178,23 +154,6 @@ export default function RouteMap({ legs = [], busLegs = [], onOpenRouteDetails }
       };
     }
 
-    const findCorridorStations = (
-      fromLat: number,
-      fromLon: number,
-      toLat: number,
-      toLon: number,
-      bufferKm: number = 14
-    ) => {
-      const candidates: Array<{ t: number; station: StationGeo }> = [];
-      stations.forEach((s) => {
-        const { distKm, t } = distancePointToSegmentKm(s.lat, s.lon, fromLat, fromLon, toLat, toLon);
-        if (distKm <= bufferKm && t >= 0 && t <= 1) {
-          candidates.push({ t, station: s });
-        }
-      });
-      candidates.sort((a, b) => a.t - b.t);
-      return candidates.map((c) => c.station);
-    };
 
     // 1. Process Train Legs
     legs.forEach((leg, legIdx) => {
@@ -263,8 +222,8 @@ export default function RouteMap({ legs = [], busLegs = [], onOpenRouteDetails }
           const best = candidates[0];
           const directDist = haversineKm(fLat, fLon, tLat, tLon);
 
-          // Only accept timetable slice if it doesn't do an extreme geographic detour
-          if (best && (directDist < 100 || best.dist <= directDist * 2.8 || !best.hasDups)) {
+          // Only accept timetable slice if it has NO internal duplicate stations and realistic distance
+          if (best && !best.hasDups && (directDist < 80 || best.dist <= Math.max(120, directDist * 2.2))) {
             timetableStops = best.sub
               .map((code) => stationMap.get(code))
               .filter((s): s is StationGeo => s != null);
@@ -294,7 +253,7 @@ export default function RouteMap({ legs = [], busLegs = [], onOpenRouteDetails }
           allCoords.push([st.lat, st.lon]);
         });
       } else {
-        // Fallback: corridor stations between from & to
+        // Fallback: plot clean direct leg endpoints without spraying dozens of unrelated rural flag stations
         if (fromSt && !addedCodes.has(fromSt.c)) {
           addedCodes.add(fromSt.c);
           stationList.push({
@@ -308,23 +267,6 @@ export default function RouteMap({ legs = [], busLegs = [], onOpenRouteDetails }
         }
         trainCoords.push([fLat, fLon]);
         allCoords.push([fLat, fLon]);
-
-        const corridor = findCorridorStations(fLat, fLon, tLat, tLon, 12);
-        corridor.forEach((s) => {
-          if (!addedCodes.has(s.c) && s.c !== fromCode && s.c !== toCode) {
-            addedCodes.add(s.c);
-            stationList.push({
-              c: s.c,
-              n: s.n,
-              lat: s.lat,
-              lon: s.lon,
-              routeRole: 'TRAIN_STOP',
-              trainNumber: tNum,
-            });
-            trainCoords.push([s.lat, s.lon]);
-            allCoords.push([s.lat, s.lon]);
-          }
-        });
 
         if (toSt && !addedCodes.has(toSt.c)) {
           addedCodes.add(toSt.c);
@@ -351,7 +293,7 @@ export default function RouteMap({ legs = [], busLegs = [], onOpenRouteDetails }
       }
     });
 
-    // 2. Process Bus Legs
+    // 2. Process Bus Legs (Highway Express Service)
     busLegs.forEach((bus, bIdx) => {
       const fromCode = bus.from_station_code.toUpperCase();
       const toCode = bus.to_station_code.toUpperCase();
@@ -378,23 +320,6 @@ export default function RouteMap({ legs = [], busLegs = [], onOpenRouteDetails }
       }
       busCoords.push([fLat, fLon]);
       allCoords.push([fLat, fLon]);
-
-      const busCorridor = findCorridorStations(fLat, fLon, tLat, tLon, 15);
-      busCorridor.forEach((s) => {
-        if (!addedCodes.has(s.c) && s.c !== fromCode && s.c !== toCode) {
-          addedCodes.add(s.c);
-          stationList.push({
-            c: s.c,
-            n: s.n,
-            lat: s.lat,
-            lon: s.lon,
-            routeRole: 'BUS_STOP',
-            busOperator: bus.operator_name,
-          });
-          busCoords.push([s.lat, s.lon]);
-          allCoords.push([s.lat, s.lon]);
-        }
-      });
 
       if (toSt && !addedCodes.has(toSt.c)) {
         addedCodes.add(toSt.c);
