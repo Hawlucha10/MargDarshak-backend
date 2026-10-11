@@ -51,3 +51,25 @@ class TrainScheduleResponse(BaseModel):
     destination_station: str
     total_stops: int
     stops: List[TrainStop]
+
+
+class EnsembleDetail(BaseModel):
+    xgboost_prob: float
+    lightgbm_prob: float
+    catboost_prob: float
+    meta_prob: float
+    p85_quantile_buffer: float
+
+
+class TrainDelayPredictionResponse(BaseModel):
+    train_number: str
+    train_name: Optional[str] = None
+    predicted_delay_minutes: float
+    p85_delay_buffer_minutes: float
+    delay_probability: float
+    risk_level: str
+    explanations: List[str]
+    safe_transfer_buffer_minutes: int
+    model_version: str
+    ensemble_detail: Optional[EnsembleDetail] = None
+    cached: bool = False

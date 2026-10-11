@@ -10,9 +10,16 @@ Supports:
 """
 
 import re
+import json
+import logging
 from datetime import datetime, date, timedelta
 from typing import Dict, Any, Optional
+import httpx
+
+from app.config import get_settings
 from app.schemas.route import RouteSearchRequest
+
+logger = logging.getLogger(__name__)
 
 
 # ---- 200+ STATION ALIAS MAP ----
@@ -136,6 +143,21 @@ def _parse_date(q: str, today: date) -> date:
         except ValueError:
             pass
 
+    # Day of month reference: "7 taahrik", "7 tareekh", "7 tarikh", "7 tareeq", "7 ko", "7th", "7 tarik"
+    day_num_match = re.search(r"(\d{1,2})\s*(?:taahrik|taarikh|tarikh|tareekh|tareeq|tarik|taarik|ko|th|st|nd|rd)\b", ql)
+    if day_num_match:
+        target_day = int(day_num_match.group(1))
+        if 1 <= target_day <= 31:
+            month = today.month
+            year = today.year
+            if target_day < today.day:
+                month = month + 1 if month < 12 else 1
+                year = year + 1 if month == 1 else year
+            try:
+                return date(year, month, target_day)
+            except ValueError:
+                pass
+
     # Relative dates
     if "today" in ql or "\u0906\u091c" in q:
         return today
@@ -231,25 +253,56 @@ def parse_natural_language_query(query: str) -> Dict[str, Any]:
             detected_origin = STATION_ALIAS_MAP.get(hindi_match.group(1).strip())
             detected_dest = STATION_ALIAS_MAP.get(hindi_match.group(2).strip())
 
-    # Fallback: scan for station names
+    # Fallback: scan for station names and IRCTC station codes ordered by position
     if not detected_origin or not detected_dest:
-        found = []
-        sorted_aliases = sorted(STATION_ALIAS_MAP.keys(), key=len, reverse=True)
-        for alias in sorted_aliases:
-            if alias in ql and STATION_ALIAS_MAP[alias] not in found:
-                found.append(STATION_ALIAS_MAP[alias])
-                if len(found) >= 2:
-                    break
-        if len(found) >= 2:
-            detected_origin = detected_origin or found[0]
-            detected_dest = detected_dest or found[1]
-        elif len(found) == 1:
+        from app.services.fallback_router import RouteSynthesizer
+        synth = RouteSynthesizer.get_instance()
+
+        STOP_WORDS = {
+            "bus", "buses", "routes", "route", "train", "trains", "ticket", "tickets",
+            "se", "to", "for", "from", "on", "in", "by", "today", "kal", "parso",
+            "tomorrow", "morning", "evening", "night", "sleeper", "fastest", "cheapest",
+            "best", "show", "find", "get", "book", "chahiye", "hai", "ki", "ka"
+        }
+
+        matches = []
+        # Multi-word aliases (e.g. 'new delhi', 'anand vihar', 'mumbai central')
+        for alias, code in sorted(STATION_ALIAS_MAP.items(), key=lambda x: len(x[0]), reverse=True):
+            if " " in alias and alias in ql:
+                pos = ql.find(alias)
+                matches.append((pos, len(alias), code))
+
+        # Single word tokens or station codes (e.g. 'gwl', 'udz', 'pune', 'bpl', 'ndls')
+        for m in re.finditer(r"\b[a-zA-Z0-9\u0900-\u097F]+\b", query):
+            w = m.group(0).lower()
+            if w in STOP_WORDS:
+                continue
+            # Try STATION_ALIAS_MAP
+            code = STATION_ALIAS_MAP.get(w)
+            if not code:
+                # Try direct station code from 8,697 stations
+                tu = m.group(0).upper()
+                if tu in synth._stations:
+                    code = tu
+            if code:
+                matches.append((m.start(), len(w), code))
+
+        # Sort matches by appearance position in sentence
+        matches.sort(key=lambda x: x[0])
+        unique_codes = []
+        for _, _, c in matches:
+            if not unique_codes or c != unique_codes[-1]:
+                unique_codes.append(c)
+
+        if len(unique_codes) >= 2:
+            detected_origin = detected_origin or unique_codes[0]
+            detected_dest = detected_dest or unique_codes[1]
+        elif len(unique_codes) == 1:
             if not detected_origin and not detected_dest:
-                # Guess whether it's origin or destination based on prepositions
                 if any(w in ql for w in ["to", "tak", "jaana", "ke liye", "pahunch"]):
-                    detected_dest = found[0]
+                    detected_dest = unique_codes[0]
                 else:
-                    detected_origin = found[0]
+                    detected_origin = unique_codes[0]
 
     needs_clarification = False
     clarification_msg = None
@@ -282,7 +335,9 @@ def parse_natural_language_query(query: str) -> Dict[str, Any]:
 
     # 4. Priority
     priority = "balanced"
-    if any(w in ql for w in ["cheapest", "cheap", "sasta", "\u0938\u0938\u094d\u0924\u093e", "\u0915\u092e \u0915\u093f\u0930\u093e\u092f\u093e", "\u0915\u092e \u092a\u0948\u0938\u0947"]):
+    if any(w in ql for w in ["bus", "ki bus", "by bus", "bus se", "bus chahiye", "sleeper bus", "volvo", "roadways", "highway bus"]):
+        priority = "multimodal"
+    elif any(w in ql for w in ["cheapest", "cheap", "sasta", "\u0938\u0938\u094d\u0924\u093e", "\u0915\u092e \u0915\u093f\u0930\u093e\u092f\u093e", "\u0915\u092e \u092a\u0948\u0938\u0947"]):
         priority = "cheapest"
     elif any(w in ql for w in ["fastest", "fast", "jaldi", "\u091c\u0932\u094d\u0926\u0940", "\u0915\u092e \u0938\u092e\u092f", "\u0924\u0947\u091c"]):
         priority = "fastest"
@@ -319,6 +374,8 @@ def parse_natural_language_query(query: str) -> Dict[str, Any]:
     elif any(w in ql for w in ["bus bhi", "include bus", "bus ok", "bus theek", "bus chalega"]):
         include_buses = True
 
+    bus_only = any(w in ql for w in ["sirf bus", "only bus", "bus only", "ki bus", "bus ticket", "bus hi"])
+
     request_payload = RouteSearchRequest(
         origin=origin,
         destination=destination,
@@ -329,6 +386,7 @@ def parse_natural_language_query(query: str) -> Dict[str, Any]:
         arrive_before_time=arrive_before,
         prefer_home_wait=prefer_home_wait,
         include_buses=include_buses,
+        bus_only=bus_only,
     )
 
     return {
@@ -348,5 +406,171 @@ def parse_natural_language_query(query: str) -> Dict[str, Any]:
             "include_buses": include_buses,
             "needs_clarification": needs_clarification,
             "clarification_message": clarification_msg,
+            "ai_explanation": None,
         },
+        "llm_used": False,
     }
+
+
+async def parse_natural_language_query_llm(query: str) -> Dict[str, Any]:
+    """
+    Intelligent NLP Parser powered by Groq LLM with fallback to local rule-based parsing.
+    Translates conversational Hinglish, Hindi, and English travel requests into structured
+    RouteSearchRequest parameters with automatic date resolution, bus preferences, and intent extraction.
+    """
+    settings = get_settings()
+    api_key = settings.groq_api_key
+    model = settings.groq_model or "qwen/qwen3.8-27b"
+
+    if not api_key:
+        return parse_natural_language_query(query)
+
+    today = date.today()
+    system_prompt = (
+        f"You are the Natural Language Travel Query Parser for MargDarshak (Indian Railways & Highway Bus network).\n"
+        f"Today's date is: {today.isoformat()} ({today.strftime('%A, %d %B %Y')}).\n\n"
+        f"CRITICAL PARSING RULES:\n"
+        f"1. City & Station Codes: Translate all origin/destinations to official IRCTC codes (e.g. 'Hazrat Nizamuddin' / 'Nizamuddin' -> 'NZM', 'Delhi' / 'New Delhi' -> 'NDLS', 'Jabalpur' -> 'JBP', 'Pune' -> 'PUNE', 'Gwalior' -> 'GWL', 'Bhopal' -> 'BPL', 'Kanpur' -> 'CNB', 'Lucknow' -> 'LKO', 'Mumbai' -> 'CSMT' / 'MMCT').\n"
+        f"2. Bus Preference & Priority: If user mentions 'bus' (e.g. 'ki bus', 'by bus', 'bus se', 'bus chahiye', 'sleeper bus', 'only bus', 'sirf bus', 'bus ticket'), you MUST set \"priority\": \"multimodal\" and \"include_buses\": true! If the user explicitly asks for bus (e.g. 'ki bus', 'only bus', 'sirf bus'), set \"bus_only\": true.\n"
+        f"3. Date Resolution: Resolve relative dates ('kal' -> tomorrow, 'parso' -> day after tomorrow, 'agle hafte' -> next week, '7 taahrik' / '7 tareekh' / '7 tarikh' -> 7th of the current month {today.year}-{today.month:02d}-07).\n\n"
+        f"Return ONLY a valid JSON object matching this schema:\n"
+        f"{{\n"
+        f'  "origin_station_code": "3-5 letter uppercase IRCTC station code, e.g. NZM, NDLS, PUNE, GWL, BPL, etc. Or null if unknown",\n'
+        f'  "origin_station_name": "Full station or city name",\n'
+        f'  "destination_station_code": "3-5 letter uppercase IRCTC station code, e.g. JBP, GWL, NDLS, PUNE, etc. Or null if unknown",\n'
+        f'  "destination_station_name": "Full station or city name",\n'
+        f'  "travel_date": "YYYY-MM-DD format (accurately resolved from today\'s date)",\n'
+        f'  "arrive_before_time": "HH:MM format if the user specified arrival deadline, or null",\n'
+        f'  "priority": "fastest | cheapest | balanced | reliable | comfort | multimodal",\n'
+        f'  "max_transfers": 0 for direct only, 1 for max 1 change, 2 for multi-hop,\n'
+        f'  "prefer_home_wait": true if user prefers waiting at home rather than long station layovers, else false,\n'
+        f'  "include_buses": true if bus travel is allowed or desired, false only if user says \'only train\' or \'sirf train\',\n'
+        f'  "bus_only": true if the user specifically requested bus travel (e.g. \'ki bus\', \'sirf bus\', \'only bus\'), else false,\n'
+        f'  "accessible_only": true if user requested wheelchair / ramp / pwd accessibility, else false,\n'
+        f'  "needs_clarification": true if origin or destination is missing/ambiguous, else false,\n'
+        f'  "clarification_message": "Friendly prompt in user\'s language asking for missing info if needs_clarification is true, else null",\n'
+        f'  "ai_explanation": "Concise 1-sentence summary of what you understood and extracted"\n'
+        f"}}"
+    )
+
+    try:
+        async with httpx.AsyncClient(timeout=6.0) as client:
+            resp = await client.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": model,
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": query}
+                    ],
+                    "response_format": {"type": "json_object"},
+                    "temperature": 0.1,
+                    "max_tokens": 500,
+                }
+            )
+
+            if resp.status_code != 200:
+                logger.warning(f"Groq NLP API responded with {resp.status_code}, falling back to rule-based engine: {resp.text}")
+                return parse_natural_language_query(query)
+
+            res_json = resp.json()
+            content = res_json["choices"][0]["message"]["content"]
+            llm_data = json.loads(content)
+
+            orig_code = llm_data.get("origin_station_code")
+            dest_code = llm_data.get("destination_station_code")
+
+            # Fallback station lookup in alias map if station code is lowercase or city name
+            if orig_code and orig_code.lower() in STATION_ALIAS_MAP:
+                orig_code = STATION_ALIAS_MAP[orig_code.lower()]
+            if dest_code and dest_code.lower() in STATION_ALIAS_MAP:
+                dest_code = STATION_ALIAS_MAP[dest_code.lower()]
+
+            needs_clarification = bool(llm_data.get("needs_clarification") or not orig_code or not dest_code)
+            clarification_msg = llm_data.get("clarification_message")
+
+            if needs_clarification and not clarification_msg:
+                if not orig_code and not dest_code:
+                    clarification_msg = f"Could you please specify where you want to travel from and to? (e.g., 'Delhi to Mumbai tomorrow' or 'Pune se Gwalior agle hafte')"
+                elif not orig_code:
+                    clarification_msg = f"Where will you be starting your journey to {dest_code}? (e.g., 'From Pune to {dest_code}')"
+                else:
+                    clarification_msg = f"Where would you like to travel from {orig_code}? (e.g., 'From {orig_code} to Gwalior')"
+
+            # Normalize travel date
+            raw_date = llm_data.get("travel_date")
+            travel_date_str = str(raw_date)[:10] if raw_date else (today + timedelta(days=1)).strftime("%Y-%m-%d")
+
+            bus_requested = any(w in query.lower() for w in ["bus", "ki bus", "by bus", "bus se", "bus chahiye", "sleeper bus", "roadways"])
+            is_bus_only = bool(llm_data.get("bus_only") or any(w in query.lower() for w in ["sirf bus", "only bus", "bus only", "ki bus", "bus ticket"]))
+
+            priority_val = str(llm_data.get("priority", "balanced")).lower()
+            if bus_requested or is_bus_only:
+                priority_val = "multimodal"
+            elif priority_val not in ["fastest", "cheapest", "balanced", "reliable", "comfort", "multimodal"]:
+                priority_val = "balanced"
+
+            max_trans = int(llm_data.get("max_transfers", 2))
+            if max_trans not in [0, 1, 2, 3]:
+                max_trans = 2
+
+            arrive_before = llm_data.get("arrive_before_time")
+            if arrive_before and not re.match(r"^\d{2}:\d{2}$", str(arrive_before)):
+                arrive_before = None
+
+            include_buses_val = bool(llm_data.get("include_buses", True))
+            if any(w in query.lower() for w in ["no bus", "sirf train", "only train"]):
+                include_buses_val = False
+            elif bus_requested or is_bus_only:
+                include_buses_val = True
+
+            parsed_req = RouteSearchRequest(
+                origin=(orig_code or "UNKNOWN").upper(),
+                destination=(dest_code or "UNKNOWN").upper(),
+                travel_date=travel_date_str,
+                max_transfers=max_trans,
+                priority=priority_val,
+                accessible_only=bool(llm_data.get("accessible_only", False)),
+                arrive_before_time=arrive_before,
+                prefer_home_wait=bool(llm_data.get("prefer_home_wait", False)),
+                include_buses=include_buses_val,
+                bus_only=is_bus_only,
+            )
+
+            ai_exp = llm_data.get("ai_explanation") or (
+                f"Understood: travel from {orig_code} to {dest_code} on {travel_date_str}"
+            )
+
+            return {
+                "original_query": query,
+                "parsed_request": parsed_req,
+                "needs_clarification": needs_clarification,
+                "clarification_message": clarification_msg,
+                "extracted_entities": {
+                    "origin_station": orig_code or "UNKNOWN",
+                    "origin_station_name": llm_data.get("origin_station_name") or orig_code,
+                    "destination_station": dest_code or "UNKNOWN",
+                    "destination_station_name": llm_data.get("destination_station_name") or dest_code,
+                    "travel_date": travel_date_str,
+                    "priority": priority_val,
+                    "max_transfers": max_trans,
+                    "accessible_only": bool(llm_data.get("accessible_only", False)),
+                    "arrive_before_time": arrive_before,
+                    "prefer_home_wait": bool(llm_data.get("prefer_home_wait", False)),
+                    "include_buses": include_buses_val,
+                    "bus_only": is_bus_only,
+                    "needs_clarification": needs_clarification,
+                    "clarification_message": clarification_msg,
+                    "ai_explanation": ai_exp,
+                },
+                "llm_used": True,
+            }
+
+    except Exception as e:
+        logger.warning(f"Exception during Groq NLP query parsing, falling back to rule engine: {e}")
+        return parse_natural_language_query(query)
+

@@ -70,9 +70,9 @@ def find_cross_quota_arbitrage(
                     "origin_fare": origin_fare,
                     "fare_difference": savings,
                     "instruction": (
-                        f"🔄 Quota Arbitrage Found: While {origin} has {origin_gn_status} under General Quota, "
-                        f"{st_name} ({st_code}) has {q_seats} Confirmed seats under {quota_type}! "
-                        f"Book ticket {st_code} ➔ {dest} and select boarding point as {origin}."
+                        f"While tickets from {origin} are on {origin_gn_status}, "
+                        f"{st_name} ({st_code}) has {q_seats} confirmed seats available! "
+                        f"You can book from {st_code} to {dest} and choose {origin} as your boarding station."
                     ),
                 })
 

@@ -11,6 +11,41 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.postgres import get_session_maker
 
 
+STATION_ALIASES: Dict[str, List[str]] = {
+    "CSMT": ["CSMT", "CSTM"],
+    "CSTM": ["CSTM", "CSMT"],
+    "MMCT": ["MMCT", "BCT", "BDTS"],
+    "BCT": ["BCT", "MMCT", "BDTS"],
+    "BDTS": ["BDTS", "BCT", "MMCT"],
+    "PRYJ": ["PRYJ", "ALD"],
+    "ALD": ["ALD", "PRYJ"],
+    "DDU": ["DDU", "MGS"],
+    "MGS": ["MGS", "DDU"],
+    "AY": ["AY", "AYC", "FD"],
+    "AYC": ["AYC", "AY", "FD"],
+    "FD": ["FD", "AY", "AYC"],
+    "SBC": ["SBC", "YPR", "SMVB"],
+    "YPR": ["YPR", "SBC", "SMVB"],
+    "SMVB": ["SMVB", "SBC", "YPR"],
+    "MAS": ["MAS", "MS"],
+    "MS": ["MS", "MAS"],
+    "NDLS": ["NDLS", "DLI", "NZM", "ANVT", "DEE"],
+    "DLI": ["DLI", "NDLS", "NZM", "ANVT", "DEE"],
+    "NZM": ["NZM", "NDLS", "DLI", "ANVT", "DEE"],
+    "ANVT": ["ANVT", "NDLS", "DLI", "NZM", "DEE"],
+    "DEE": ["DEE", "NDLS", "DLI", "NZM", "ANVT"],
+    "GHY": ["GHY", "KYQ"],
+    "KYQ": ["KYQ", "GHY"],
+    "BBS": ["BBS", "KUR"],
+    "KUR": ["KUR", "BBS"],
+}
+
+
+def get_station_aliases(code: str) -> List[str]:
+    c = (code or "").upper().strip()
+    return STATION_ALIASES.get(c, [c])
+
+
 async def get_connecting_buses(
     from_station_code: str,
     to_station_code: str,
@@ -19,11 +54,27 @@ async def get_connecting_buses(
 ) -> List[Dict[str, Any]]:
     """
     Find bus routes that bridge a train layover between two railway stations.
-    Looks up bus terminals near both stations and returns connecting buses.
+    Looks up bus terminals near both stations (supporting city multi-station aliases) and returns connecting buses.
     """
     session_maker = get_session_maker()
     async with session_maker() as session:
-        query = text("""
+        from_codes = get_station_aliases(from_station_code)
+        to_codes = get_station_aliases(to_station_code)
+
+        where_conds = [
+            "ft.nearest_station_code = ANY(:from_codes)",
+            "tt.nearest_station_code = ANY(:to_codes)",
+        ]
+        params = {
+            "from_codes": from_codes,
+            "to_codes": to_codes,
+            "lim": limit,
+        }
+        if after_time:
+            where_conds.append("br.departure >= CAST(:after_time AS TIME)")
+            params["after_time"] = after_time
+
+        query_sql = f"""
             SELECT
                 br.route_id, br.route_code, br.bus_type,
                 br.departure, br.arrival, br.duration_minutes,
@@ -37,19 +88,12 @@ async def get_connecting_buses(
             JOIN bus_operators bo ON br.operator_id = bo.operator_id
             JOIN bus_terminals ft ON br.from_terminal_id = ft.terminal_id
             JOIN bus_terminals tt ON br.to_terminal_id = tt.terminal_id
-            WHERE ft.nearest_station_code = :from_stn
-              AND tt.nearest_station_code = :to_stn
-              AND (:after_time IS NULL OR br.departure >= :after_time::time)
+            WHERE {" AND ".join(where_conds)}
             ORDER BY br.departure ASC
             LIMIT :lim
-        """)
+        """
 
-        result = await session.execute(query, {
-            "from_stn": from_station_code.upper(),
-            "to_stn": to_station_code.upper(),
-            "after_time": after_time,
-            "lim": limit,
-        })
+        result = await session.execute(text(query_sql), params)
 
         buses = []
         for row in result.fetchall():

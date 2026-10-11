@@ -10,7 +10,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.api.v1 import availability, search, stations, trains
+from app.api.v1 import availability, search, stations, trains, chat
 
 
 @asynccontextmanager
@@ -71,6 +71,7 @@ app.include_router(search.router, prefix="/api/v1", tags=["Search"])
 app.include_router(stations.router, prefix="/api/v1", tags=["Stations"])
 app.include_router(trains.router, prefix="/api/v1", tags=["Trains"])
 app.include_router(availability.router, prefix="/api/v1", tags=["Availability"])
+app.include_router(chat.router, prefix="/api/v1", tags=["Chat"])
 
 
 @app.get("/", tags=["Health"])
@@ -79,15 +80,46 @@ async def root():
     return {"service": "MargDarshak", "status": "running", "version": "0.1.0"}
 
 
+@app.get("/health", tags=["Health"])
 @app.get("/api/v1/health", tags=["Health"])
 async def health_check():
-    """Health check — reports status of all connected services."""
+    """Health check — reports real-time status of all connected services."""
+    db_status = "unavailable"
+    try:
+        from app.db.postgres import get_session_maker
+        from sqlalchemy import text
+        session_maker = get_session_maker()
+        async with session_maker() as session:
+            await session.execute(text("SELECT 1"))
+            db_status = "connected"
+    except Exception:
+        db_status = "error"
+
+    redis_status = "unavailable"
+    try:
+        from app.db.redis_client import get_redis
+        redis = get_redis()
+        pong = await redis.ping()
+        if pong:
+            redis_status = "connected"
+    except Exception:
+        redis_status = "error"
+
+    ml_status = "unavailable"
+    try:
+        from app.ml.delay_predictor import get_predictor
+        p = get_predictor()
+        if p.ready:
+            ml_status = "ready"
+    except Exception:
+        ml_status = "error"
+
     return {
         "status": "ok",
         "services": {
             "api": "running",
-            "database": "pending",  # Will be "connected" after Phase 1
-            "redis": "pending",
-            "ml_model": "pending",
+            "database": db_status,
+            "redis": redis_status,
+            "ml_model": ml_status,
         },
     }

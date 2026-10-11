@@ -41,8 +41,12 @@ class Settings(BaseSettings):
 
     # External APIs (CRIS_PRODUCTION mode)
     rscfoss_api_url: str = "https://api.rscfoss.com"
-    rapidapi_key: str = "b2915a7aa0msh8c3cf4533c0616cp18ddaajsn34a0acd9268b"
+    rapidapi_key: str = ""
     rapidapi_host: str = "railkit-indian-railway-data.p.rapidapi.com"
+
+    # Groq LLM Assistant
+    groq_api_key: str = ""
+    groq_model: str = "qwen/qwen3.8-27b"
 
 
     @property

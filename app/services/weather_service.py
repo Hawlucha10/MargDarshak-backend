@@ -20,7 +20,7 @@ DEFAULT_WEATHER_HAZARDS = [
         "recommended_action": "AVOID_COASTAL_LINE",
         "delay_penalty_minutes": 180,
         "active_until": "2026-11-30",
-        "description": "Severe cyclonic circulation near Andhra/Odisha coast. Track speed restricted to 45 km/h.",
+        "description": "Severe storm near Andhra and Odisha coast. Trains may run slower than usual.",
     },
     {
         "hazard_id": "FOG_RED_02",
@@ -32,7 +32,7 @@ DEFAULT_WEATHER_HAZARDS = [
         "recommended_action": "INFLATE_CHANGE_BUFFERS",
         "delay_penalty_minutes": 75,
         "active_until": "2026-02-28",
-        "description": "Zero visibility fog conditions on Delhi-Kanpur-Prayagraj Grand Trunk route.",
+        "description": "Heavy fog along Delhi and Uttar Pradesh route. Trains may be delayed.",
     },
     {
         "hazard_id": "GHATS_LANDSLIDE_03",
@@ -44,7 +44,7 @@ DEFAULT_WEATHER_HAZARDS = [
         "recommended_action": "INCREASE_CONNECTION_SLACK",
         "delay_penalty_minutes": 90,
         "active_until": "2026-09-30",
-        "description": "Heavy rainfall warning on Konkan Railway route with boulder net checks.",
+        "description": "Heavy rainfall on Konkan Railway route. Trains may take extra time.",
     },
 ]
 
@@ -106,8 +106,8 @@ class WeatherAwareRouter:
 
         if should_reroute:
             reroute_advice = (
-                "⚠️ IMD Alert: Critical weather warning on primary corridor. "
-                "Automatically prioritizing inland bypass route via central corridor."
+                "Severe weather warning on main route. "
+                "We are showing safer alternative routes for you."
             )
 
         return {

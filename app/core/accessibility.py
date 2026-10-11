@@ -80,5 +80,5 @@ def audit_route_accessibility(
         "total_estimated_walking_meters": total_walking_meters,
         "estimated_transfer_walk_minutes": estimated_walk_minutes,
         "station_details": station_audits,
-        "accessibility_badge": "♿ 100% Step-Free Accessible" if is_compliant and require_step_free else "Standard Route",
+        "accessibility_badge": "Ramps and elevators available for easy boarding" if is_compliant and require_step_free else "",
     }

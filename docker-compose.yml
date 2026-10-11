@@ -46,5 +46,16 @@ services:
       redis:
         condition: service_healthy
 
+  # React + Vite Frontend (Nginx SPA)
+  frontend:
+    build:
+      context: ../MargDarshak-frontend
+      dockerfile: Dockerfile
+    container_name: margdarshak-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+
 volumes:
   pgdata:

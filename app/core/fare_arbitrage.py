@@ -60,8 +60,8 @@ def find_upstream_arbitrage(
                 "origin_fare": origin_fare,
                 "savings": max(0, savings),
                 "tip": (
-                    f"💡 Confirmed seats ({u_seats} available) from {u_name} ({u_code})! "
-                    f"Book from {u_code} to {dest_code} and set your boarding station as {origin_code}."
+                    f"Confirmed seats ({u_seats} available) from {u_name} ({u_code}). "
+                    f"Book from {u_code} to {dest_code} and set your boarding station as {origin_code} to secure your seat."
                 ),
             })
 

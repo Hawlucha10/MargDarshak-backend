@@ -12,6 +12,11 @@ def dominates(a: Dict[str, Any], b: Dict[str, Any]) -> bool:
     Criteria to MINIMIZE: travel_time, fare, transfers, wait_time
     Criteria to MAXIMIZE: reliability
     """
+    # Multimodal / bus routes serve as crucial seat-availability bypasses for road transit,
+    # so a pure rail route should not strictly dominate them out of the Pareto front.
+    if b.get("is_multimodal") and not a.get("is_multimodal"):
+        return False
+
     # Check if 'a' is no worse than 'b' in all criteria
     no_worse = (
         a["travel_time_min"] <= b["travel_time_min"]
@@ -109,27 +114,25 @@ def assign_pareto_labels(routes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         labels = []
         if multimodal_fastest and r is multimodal_fastest and "MULTIMODAL_FASTEST" not in assigned_labels:
             labels.append("MULTIMODAL_FASTEST")
-            assigned_labels.add("MULTIMODAL_FASTEST")
         if r is fastest and "FASTEST" not in assigned_labels:
             labels.append("FASTEST")
-            assigned_labels.add("FASTEST")
         if r is most_comfortable and r.get("transfers", 0) > 0 and "COMFORT_HOMESTAY" not in assigned_labels:
             labels.append("COMFORT_HOMESTAY")
-            assigned_labels.add("COMFORT_HOMESTAY")
         if r is cheapest and "CHEAPEST" not in assigned_labels:
             labels.append("CHEAPEST")
-            assigned_labels.add("CHEAPEST")
         if r is fewest_transfers and "FEWEST_TRANSFERS" not in assigned_labels:
             labels.append("FEWEST_TRANSFERS")
-            assigned_labels.add("FEWEST_TRANSFERS")
         if r is most_reliable and "MOST_RELIABLE" not in assigned_labels:
             labels.append("MOST_RELIABLE")
-            assigned_labels.add("MOST_RELIABLE")
         if r is balanced and "BALANCED" not in assigned_labels:
             labels.append("BALANCED")
-            assigned_labels.add("BALANCED")
 
-        r_copy["label"] = labels[0] if labels else ("MULTIMODAL" if r.get("is_multimodal") else "ALTERNATIVE")
+        if labels:
+            chosen = labels[0]
+            assigned_labels.add(chosen)
+            r_copy["label"] = chosen
+        else:
+            r_copy["label"] = "MULTIMODAL" if r.get("is_multimodal") else "ALTERNATIVE"
         labeled_routes.append(r_copy)
 
     return labeled_routes

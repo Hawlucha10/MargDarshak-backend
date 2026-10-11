@@ -66,9 +66,8 @@ def get_demand_adaptive_buffer(
             "added_buffer_min": effective_buffer - base_buffer_min,
             "multiplier": active_surge["multiplier"],
             "explanation": (
-                f"📊 {active_surge['name']}: Connection buffer dynamically increased from "
-                f"{base_buffer_min}m to {effective_buffer}m (+{effective_buffer - base_buffer_min}m) "
-                f"to protect against seasonal platform crowding and rake delays."
+                f"{active_surge['name']}: Extra transfer time of {effective_buffer - base_buffer_min} minutes "
+                f"added to help you comfortably change trains during holiday rush."
             ),
         }
 

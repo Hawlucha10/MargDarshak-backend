@@ -9,6 +9,7 @@ Replicates the core operational services of Indian Railways with zero external A
 
 import asyncio
 from datetime import datetime, timezone, timedelta
+import hashlib
 import json
 import math
 import random
@@ -56,6 +57,15 @@ def _minutes_to_time_str(minutes: int) -> str:
     hh = normalized // 60
     mm = normalized % 60
     return f"{hh:02d}:{mm:02d}"
+
+
+def _stable_hash(val: str) -> int:
+    """
+    Deterministic cross-process, cross-platform 64-bit integer hash.
+    Unlike Python's built-in hash(), this never fluctuates with PYTHONHASHSEED salt,
+    server restarts, or across multiple uvicorn worker processes.
+    """
+    return int(hashlib.md5(val.encode("utf-8")).hexdigest()[:15], 16)
 
 
 def _calculate_telescopic_fares(dist_km: float, is_superfast: bool = True) -> Dict[str, int]:
@@ -290,6 +300,8 @@ class CrisSimulatorGateway(RailwayGateway):
         pred = predictor.predict_delay(
             train_number=clean_num,
             month=now_ist.month,
+            day_of_week=now_ist.weekday(),
+            departure_hour=origin_dep_min // 60,
             zone=stops[0]["zone"],
             distance_km=total_dist,
         )
@@ -517,8 +529,10 @@ class CrisSimulatorGateway(RailwayGateway):
         to_code = to_station.upper().strip()
         clean_quota = quota.upper().strip() if quota else "GN"
         clean_class = travel_class.upper().strip() if travel_class else "SL"
+        today_ist = datetime.now(IST).strftime("%Y-%m-%d")
+        clean_date = travel_date.strip() if (travel_date and travel_date.strip()) else today_ist
 
-        cache_key = f"digital_twin:avail:{clean_num}:{from_code}:{to_code}:{travel_date}:{clean_class}:{clean_quota}"
+        cache_key = f"digital_twin:avail:{clean_num}:{from_code}:{to_code}:{clean_date}:{clean_class}:{clean_quota}"
         try:
             redis = get_redis()
             cached = await redis.get(cache_key)
@@ -529,15 +543,41 @@ class CrisSimulatorGateway(RailwayGateway):
         except Exception:
             pass
 
+        # Calculate days ahead for realistic booking curve
+        try:
+            target_dt = datetime.strptime(clean_date, "%Y-%m-%d").date()
+            today_dt = datetime.now(IST).date()
+            days_ahead = max(0, (target_dt - today_dt).days)
+        except Exception:
+            days_ahead = 14
+
         stops = await self._fetch_stops(clean_num)
         train_name = stops[0]["train_name"] if stops else f"Express {clean_num}"
 
         stn_codes = [s["station_code"].upper() for s in stops]
-        from_idx = stn_codes.index(from_code) if from_code in stn_codes else 0
-        to_idx = stn_codes.index(to_code) if to_code in stn_codes else (len(stops) - 1 if stops else 1)
+        from_idx = -1
+        to_idx = -1
+
+        # Locate forward-moving pair where from_idx < to_idx
+        for i, code in enumerate(stn_codes):
+            if code == from_code:
+                for j in range(i + 1, len(stn_codes)):
+                    if stn_codes[j] == to_code:
+                        from_idx = i
+                        to_idx = j
+                        break
+                if from_idx != -1:
+                    break
+
+        # Fallback if forward pair wasn't directly found
+        if from_idx == -1 or to_idx == -1:
+            from_idx = stn_codes.index(from_code) if from_code in stn_codes else 0
+            to_idx = stn_codes.index(to_code) if to_code in stn_codes else (len(stops) - 1 if stops else 1)
+            if from_idx >= to_idx and len(stops) > from_idx + 1:
+                to_idx = len(stops) - 1
 
         # Calculate rail distance
-        if stops and from_idx < len(stops) and to_idx < len(stops):
+        if stops and from_idx < len(stops) and to_idx < len(stops) and from_idx < to_idx:
             seg_dist = max(35.0, float(abs(stops[to_idx]["distance_km"] - stops[from_idx]["distance_km"])))
         else:
             seg_dist = 420.0
@@ -561,27 +601,64 @@ class CrisSimulatorGateway(RailwayGateway):
 
         classes_output: List[ClassAvailabilityInfo] = []
 
-        # Deterministic seed based on train + date + route
-        route_hash = abs(hash(f"{clean_num}:{from_code}:{to_code}:{travel_date}"))
+        # Deterministic seed based on train + date + route (stable across all processes & restarts)
+        route_hash = _stable_hash(f"{clean_num}:{from_code}:{to_code}:{clean_date}")
 
         for c_code, c_name, capacity in class_configs:
             fare = fares.get(c_code, 250)
 
-            if is_origin_boarding:
-                # GNWL from origin: Healthy confirmed berth pool
-                seats_avbl = (route_hash % 28) + 12
+            if clean_quota == "TQ":
+                # Tatkal Quota: Opens 1 day prior to travel
+                if days_ahead > 1:
+                    status_str = "TQ NOT OPEN"
+                    seats_avbl = 0
+                    is_avbl = False
+                    prob = 0.0
+                    prob_pct = "0%"
+                else:
+                    tq_seats = ((route_hash + capacity) % 8) + 1
+                    status_str = f"AVAILABLE {tq_seats}"
+                    is_avbl = True
+                    prob = 1.0
+                    prob_pct = "100%"
+                    seats_avbl = tq_seats
+            elif is_origin_boarding:
+                # GNWL from origin: High availability pool modulated by advance days
+                if days_ahead <= 2:
+                    seats_avbl = (route_hash % 10) + 4
+                elif days_ahead <= 14:
+                    seats_avbl = (route_hash % 20) + 12
+                else:
+                    seats_avbl = (route_hash % 28) + 20
                 status_str = f"AVAILABLE {seats_avbl}"
                 is_avbl = True
                 prob = 1.0
                 prob_pct = "100%"
             else:
-                # PQWL from intermediate station: Waitlisted!
-                wl_num = ((route_hash + capacity) % 35) + 12
-                status_str = f"PQWL {wl_num} (WL {wl_num})"
-                is_avbl = False
-                prob = max(0.25, min(0.65, 0.70 - (wl_num / 80.0)))
-                prob_pct = f"{int(round(prob * 100))}%"
-                seats_avbl = wl_num
+                # PQWL / RLWL from intermediate station
+                if days_ahead > 30 and ((route_hash + capacity) % 4 == 0):
+                    seats_avbl = ((route_hash + capacity) % 8) + 2
+                    status_str = f"AVAILABLE {seats_avbl}"
+                    is_avbl = True
+                    prob = 1.0
+                    prob_pct = "100%"
+                else:
+                    if days_ahead <= 2:
+                        wl_num = ((route_hash + capacity) % 35) + 18
+                    elif days_ahead <= 14:
+                        wl_num = ((route_hash + capacity) % 25) + 8
+                    else:
+                        wl_num = ((route_hash + capacity) % 18) + 4
+                    status_str = f"PQWL {wl_num} (WL {wl_num})"
+                    is_avbl = False
+                    # Confirmation probability decreases with higher waitlist and smaller capacity
+                    prob = max(0.15, min(0.85, 0.88 - (wl_num / (capacity * 0.75))))
+                    if days_ahead <= 2:
+                        prob = max(0.12, prob * 0.75)
+                    elif days_ahead >= 14:
+                        prob = min(0.90, prob * 1.15)
+                    prob_pct = f"{int(round(prob * 100))}%"
+                    seats_avbl = wl_num
 
             classes_output.append(
                 ClassAvailabilityInfo(
@@ -599,44 +676,86 @@ class CrisSimulatorGateway(RailwayGateway):
         # -------------------------------------------------------------
         # CONFIRMTKT UPSTREAM QUOTA ARBITRAGE DISCOVERY
         # -------------------------------------------------------------
-        # If user is at intermediate station and requested class is waitlisted,
-        # scan upstream to origin station where General Quota (GNWL) has confirmed berths!
-        if not is_origin_boarding and from_idx > 0 and stops:
-            upstream_stn = stops[0]
-            upstream_code = upstream_stn["station_code"]
-            upstream_name = upstream_stn["station_name"]
-
-            upstream_dist = max(50.0, float(abs(stops[to_idx]["distance_km"] - upstream_stn["distance_km"])))
-            upstream_fares = _calculate_telescopic_fares(upstream_dist, is_superfast=True)
+        # When user boards midway and requested class is waitlisted:
+        # Scan upstream stops to find stations that unlock confirmed General Quota (GNWL)
+        # with the minimum additional fare.
+        if not is_origin_boarding and from_idx > 0 and stops and from_idx < to_idx:
+            # Candidates to evaluate:
+            # 1. Terminal origin: stops[0] (guarantees largest GNWL pool)
+            # 2. Up to 5 stops immediately preceding from_idx (closest upstream hubs)
+            candidate_indices = [0]
+            for step in range(1, min(6, from_idx + 1)):
+                idx = from_idx - step
+                if idx not in candidate_indices and idx >= 0:
+                    candidate_indices.append(idx)
 
             user_fare = fares.get(clean_class, 320)
-            upstream_fare = upstream_fares.get(clean_class, user_fare + 65)
-            fare_diff = upstream_fare - user_fare
+            best_arbitrage = None
 
-            confirmed_seats = (route_hash % 24) + 16
+            for u_idx in candidate_indices:
+                u_stn = stops[u_idx]
+                u_code = u_stn["station_code"].upper()
+                u_name = u_stn.get("station_name", u_code)
 
-            arbitrage_tip = QuotaArbitrageTip(
-                upstream_station_code=upstream_code,
-                upstream_station_name=upstream_name,
-                quota_type="GNWL",
-                available_seats=confirmed_seats,
-                ticket_fare=upstream_fare,
-                origin_fare=user_fare,
-                savings_inr=-fare_diff,
-                instruction=(
-                    f"[ARBITRAGE TIP] Confirmed seat available from Upstream Station {upstream_code} ({upstream_name})! "
-                    f"While booking from {from_code} is waitlisted ({classes_output[0].status}), "
-                    f"booking from {upstream_code} -> {to_code} unlocks {confirmed_seats} Confirmed seats under GNWL! "
-                    f"Book ticket with origin {upstream_code} and set your boarding station as {from_code}. Extra fare: Rs.{fare_diff}."
-                ),
-            )
+                # Never recommend boarding/alighting at the destination or after it
+                if u_code == from_code or u_code == to_code:
+                    continue
+
+                u_dist = max(50.0, float(abs(stops[to_idx]["distance_km"] - u_stn["distance_km"])))
+                u_fares = _calculate_telescopic_fares(u_dist, is_superfast=True)
+                u_fare = u_fares.get(clean_class, user_fare + 45)
+                fare_diff = max(0, u_fare - user_fare)
+
+                # Upstream seat pool:
+                # Terminal origin (idx 0) has full General Quota (18-44 confirmed seats)
+                # Intermediate upstream stations have confirmed quota (12-32 seats)
+                u_hash = _stable_hash(f"{clean_num}:{u_code}:{to_code}:{clean_date}")
+                confirmed_seats = (u_hash % 26) + (18 if u_idx == 0 else 12)
+                q_type = "GNWL" if u_idx == 0 else "RLGN"
+
+                if confirmed_seats > 5:
+                    # Select candidate that unlocks confirmed seats with lowest extra fare
+                    if best_arbitrage is None or fare_diff < best_arbitrage["fare_diff"]:
+                        best_arbitrage = {
+                            "code": u_code,
+                            "name": u_name,
+                            "quota": q_type,
+                            "seats": confirmed_seats,
+                            "ticket_fare": u_fare,
+                            "fare_diff": fare_diff,
+                        }
+
+            if best_arbitrage:
+                u_code = best_arbitrage["code"]
+                u_name = best_arbitrage["name"]
+                q_type = best_arbitrage["quota"]
+                c_seats = best_arbitrage["seats"]
+                u_fare = best_arbitrage["ticket_fare"]
+                f_diff = best_arbitrage["fare_diff"]
+
+                first_status = classes_output[0].status if classes_output else "Waitlisted"
+                arbitrage_tip = QuotaArbitrageTip(
+                    upstream_station_code=u_code,
+                    upstream_station_name=u_name,
+                    quota_type=q_type,
+                    available_seats=c_seats,
+                    ticket_fare=u_fare,
+                    origin_fare=user_fare,
+                    savings_inr=-f_diff,
+                    instruction=(
+                        f"Confirmed seats available from {u_name} ({u_code})! "
+                        f"While tickets directly from {from_code} are on waiting list ({first_status}), "
+                        f"{c_seats} confirmed seats are available when booking from {u_code} to {to_code}. "
+                        f"You can book from {u_code} and select your boarding station as {from_code} (difference: Rs.{f_diff})."
+                    ),
+                )
 
         response = TrainAvailabilityResponse(
             train_number=clean_num,
             train_name=train_name,
             from_station=from_code,
             to_station=to_code,
-            travel_date=travel_date,
+            travel_date=clean_date,
             quota=clean_quota,
             classes=classes_output,
             arbitrage_recommendation=arbitrage_tip,

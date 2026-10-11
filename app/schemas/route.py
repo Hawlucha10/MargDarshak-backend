@@ -9,11 +9,12 @@ class RouteSearchRequest(BaseModel):
     destination: str = Field(..., description="Destination station code (e.g. PUNE)", max_length=10)
     travel_date: str = Field(..., description="Date of travel (YYYY-MM-DD)")
     max_transfers: int = Field(default=2, ge=0, le=3, description="Maximum train changes (0 to 3)")
-    priority: str = Field(default="balanced", description="Optimization priority: fastest, cheapest, balanced, reliable, comfort")
+    priority: str = Field(default="balanced", description="Optimization priority: fastest, cheapest, balanced, reliable, comfort, multimodal")
     accessible_only: bool = Field(default=False, description="Require 100% step-free wheelchair ramp accessibility")
     arrive_before_time: Optional[str] = Field(default=None, description="Deadline: arrive before this time (HH:MM format)")
     prefer_home_wait: bool = Field(default=False, description="Minimize intermediate station layover; wait at home instead")
     include_buses: bool = Field(default=True, description="Include multimodal bus alternatives for long layovers")
+    bus_only: bool = Field(default=False, description="Filter for bus-only or bus-prioritized journeys")
 
 
 class TrainLeg(BaseModel):
@@ -92,6 +93,11 @@ class JourneyRoute(BaseModel):
     is_multimodal: bool = Field(default=False, description="True if route includes bus legs")
     time_saved_vs_train_minutes: Optional[int] = Field(default=None, description="Minutes saved by taking bus vs waiting for next train")
     comfort_score: Optional[float] = Field(default=None, description="Lower is better: Duration + 3x intermediate layover")
+    departure_time: Optional[str] = None
+    arrival_time: Optional[str] = None
+    departure_date: Optional[str] = None
+    arrival_date: Optional[str] = None
+    total_travel_minutes: Optional[int] = None
 
 
 class RouteSearchResponse(BaseModel):
