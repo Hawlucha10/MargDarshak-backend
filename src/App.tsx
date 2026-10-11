@@ -3,6 +3,7 @@ import SearchPage from './pages/SearchPage';
 import ResultsPage from './pages/ResultsPage';
 import { ChatAssistant } from './components/ChatAssistant';
 import { ChatProvider } from './context/ChatContext';
+import DisclaimerBanner from './components/DisclaimerBanner';
 
 function AppContent() {
   const location = useLocation();
@@ -18,6 +19,7 @@ function AppContent() {
 
   return (
     <div className="h-[100dvh] max-h-[100dvh] w-full bg-[#E5D5BF] flex flex-col overflow-hidden relative">
+      <DisclaimerBanner />
       <main className="flex-1 flex flex-col overflow-hidden min-h-0">
         <Routes>
           <Route path="/" element={<SearchPage />} />

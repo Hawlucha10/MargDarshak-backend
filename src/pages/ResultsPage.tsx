@@ -471,7 +471,7 @@ export default function ResultsPage() {
   };
 
   return (
-    <div className="h-screen w-screen flex flex-col overflow-hidden bg-[#E5D5BF] font-['Timeless']">
+    <div className="h-full w-full flex flex-col overflow-hidden bg-[#E5D5BF] font-['Timeless']">
       {/* Main Content Area: 40% Map / 60% Details Split */}
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
         {/* Map Area: 40% Width on desktop, responsive full-height tab on mobile */}

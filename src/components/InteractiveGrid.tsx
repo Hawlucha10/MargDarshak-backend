@@ -28,7 +28,7 @@ export default function InteractiveGrid({ children }: Props) {
   }, []);
 
   return (
-    <div className="relative w-full h-[100dvh] max-h-[100dvh] overflow-hidden bg-[#E5D5BF]">
+    <div className="relative w-full h-full max-h-full overflow-hidden bg-[#E5D5BF]">
       {/* 1. Base Blueprint Grid (#4A5D30 Dark Green on #E5D5BF Background) */}
       <div
         className="absolute inset-0 pointer-events-none"
