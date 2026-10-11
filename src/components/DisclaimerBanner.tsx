@@ -14,19 +14,16 @@ export default function DisclaimerBanner() {
 
   return (
     <aside
-      aria-label="Prototype Version Disclaimer"
+      aria-label="Version Disclaimer"
       className="w-full bg-[#3D4C27] text-[#F6F0E6] text-[11px] sm:text-xs py-1.5 px-3 sm:px-4 flex items-center justify-between gap-2 font-['Timeless'] shrink-0 z-50 tracking-wide border-b border-[#2D381D] select-none shadow-xs"
     >
-      <div className="flex-1 flex items-center justify-center gap-2 flex-wrap text-center">
-        <span className="inline-flex items-center px-2 py-0.5 text-[10px] uppercase font-bold tracking-wider bg-[#F6F0E6]/20 text-[#FAF7F2] rounded">
-          Test Version
-        </span>
+      <div className="flex-1 flex items-center justify-center text-center">
         <span className="font-medium text-stone-200">
           <span className="hidden sm:inline">
-            Prototype Evaluation Build: Operating on augmented transit data for SIH. Official Indian Railways CRIS & WTT live feed integration ready.
+            This is a test version built on augmented data. Official Indian Railways CRIS & WTT live feed integration ready.
           </span>
           <span className="inline sm:hidden">
-            Built on augmented prototype data for SIH (CRIS & WTT ready).
+            This is a test version built on augmented data (CRIS & WTT ready).
           </span>
         </span>
       </div>
