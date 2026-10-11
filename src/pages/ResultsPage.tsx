@@ -507,7 +507,7 @@ export default function ResultsPage() {
                   : needsClarification
                   ? 'Journey Clarification Needed'
                   : results && results.total_routes_found > 0
-                  ? `${results.total_routes_found} Optimal Routes`
+                  ? `${results.total_routes_found} Available Routes`
                   : 'No Direct Routes Found'}
               </h2>
 
